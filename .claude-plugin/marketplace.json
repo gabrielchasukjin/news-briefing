@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "name": "news-briefing",
+  "description": "Generate a curated, editorial-quality news briefing as a local HTML page. Type /news <topic> to get a visual briefing with real images, real links, and live market data.",
+  "owner": { "name": "gabrielcha" },
+  "plugins": [
+    {
+      "name": "news-briefing",
+      "description": "Editorially curated news briefing generator with market data sidebar",
+      "version": "1.0.0",
+      "source": "./news-briefing-plugin"
+    }
+  ]
+}

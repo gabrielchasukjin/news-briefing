@@ -1,0 +1,6 @@
+{
+  "name": "@news-briefing/skill",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Claude Code plugin that generates editorially curated news briefings as local HTML pages"
+}
