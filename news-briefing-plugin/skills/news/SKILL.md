@@ -20,33 +20,69 @@ The output is a dark-themed editorial page with:
 
 Follow these steps precisely. Do NOT skip steps or take shortcuts.
 
-### Phase 1: Broad Search
+### Phase 1: Source from High-Signal Feeds
 
-Use the **WebSearch** tool to cast a wide net. Run 2-3 parallel searches with different angles on the topic.
+Do NOT start with generic web searches. Instead, go directly to the places where smart, technical people actually find news. Use **WebFetch** and **WebSearch** in parallel to pull from these community-vetted sources.
 
-If the user provided a topic (e.g., `/news crypto`, `/news climate tech`):
-- Search: `"most important {topic} news this week {current month} {current year}"`
-- Search: `"biggest {topic} stories {current date}"`
-- Search: `"{topic} breaking news {current month} {current year}"`
+#### Step 1A: Fetch community feeds (run ALL in parallel)
 
-If no topic was provided, default to tech and AI:
-- Search: `"most important AI and tech news this week {current month} {current year}"`
-- Search: `"biggest tech stories {current date}"`
-- Search: `"AI industry breaking news {current month} {current year}"`
+Use **WebFetch** on these URLs to get the current front pages:
 
-Collect ALL results from all searches into a single pool. You should have 20-30 raw results.
+**Always fetch (regardless of topic):**
+- `https://news.ycombinator.com/front` — Hacker News front page. Extract story titles, source domains, point counts, comment counts. Stories with 300+ points are high-signal.
+- `https://techmeme.com/` — Techmeme river. Algorithmically curated tech news. Extract headlines and source outlets.
+
+**For AI/ML topics, also fetch:**
+- `https://tldr.tech/ai` — TLDR AI newsletter. Latest curated AI stories.
+- `https://arxiv.org/list/cs.AI/recent` — Recent ArXiv papers. Only pick papers with real-world implications, not pure theory.
+
+**For crypto topics, also fetch:**
+- `https://tldr.tech/crypto` — TLDR Crypto newsletter.
+- `https://www.theblock.co/latest` — The Block latest.
+
+**For general tech, also fetch:**
+- `https://tldr.tech/` — TLDR Tech newsletter.
+- `https://lobste.rs/` — Lobsters front page. More niche/technical than HN.
+
+**For startups/products, also fetch:**
+- `https://www.producthunt.com/` — Product Hunt front page.
+
+For each feed, extract story titles, URLs, and any engagement signals (points, comments, upvotes).
+
+#### Step 1B: Cross-reference with web search (run in parallel with 1A)
+
+Run 2 **WebSearch** queries to catch anything the feeds might miss:
+- `"most important {topic} news {current month} {current year}"`
+- `"{topic} breaking news today {current date}"`
+
+If no topic was provided, default to tech and AI.
+
+#### Step 1C: Merge and score
+
+Combine all results from 1A and 1B into a single pool. You should have 30-50 raw stories.
+
+**Score each story higher if it appears in multiple sources.** A story on both HN (300+ pts) and Techmeme is much higher signal than one that only appeared in a generic Google search result.
 
 ### Phase 2: Editorial Curation
 
-From the pool, select exactly **5 stories** using these editorial criteria (in priority order):
+From the scored pool, select exactly **5 stories** using these criteria (in priority order):
 
-1. **Significance** — Does this actually matter, or is it noise? Will people still be talking about it next week?
-2. **Source credibility** — Prefer established outlets (TechCrunch, WSJ, NYT, Bloomberg, Fortune, Ars Technica, MIT Tech Review, CNBC, Reuters) over random blogs
-3. **Uniqueness** — Each story must cover a distinct angle. Drop duplicates and rehashes.
-4. **Recency** — Prefer stories from the last 48 hours. Only go older if the story is genuinely important.
-5. **Diversity** — Cover different facets of the topic (e.g., for tech: models, hardware, policy, business, culture)
+1. **Cross-source signal** — Stories that appear across multiple high-signal feeds (HN + Techmeme, HN + TLDR, etc.) get priority. This is the strongest quality signal.
+2. **Community engagement** — High point counts, comment counts, and upvotes indicate the story resonated with a technical audience.
+3. **Significance** — Does this actually matter? Will people still be talking about it next week? Prefer stories that change something (new capability, policy shift, market move) over incremental updates.
+4. **Uniqueness** — Each story must cover a distinct angle. Drop duplicates and rehashes. If two stories cover the same event, pick the better source.
+5. **Surprise factor** — Prefer stories that are genuinely interesting or counterintuitive over predictable press releases. The robot dogs story is more interesting than "Company X raises $Y million."
+6. **Diversity** — Cover different facets (e.g., for tech: a deep technical post, a policy/business story, a tool/product, a cultural moment, an infrastructure play).
 
-Rank them 1-5 by significance. Story #1 gets hero treatment.
+**What to avoid:**
+- Generic fundraising announcements (unless the amount or implications are genuinely significant)
+- Listicles and roundup posts
+- SEO-driven blog posts with no original reporting
+- Stories that are just repackaging a press release
+
+Rank the final 5 stories 1-5 by significance. Story #1 gets hero treatment.
+
+**For source linking:** When a story originated from a community feed (HN, Lobsters), link to the **original source article**, not the discussion thread. But note the community engagement (e.g., "654 points on HN") in the editorial lede if it adds context.
 
 ### Phase 3: Deep Content Fetch
 
