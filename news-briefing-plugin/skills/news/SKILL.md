@@ -20,6 +20,89 @@ The output is a dark-themed editorial page with:
 
 Follow these steps precisely. Do NOT skip steps or take shortcuts.
 
+### Phase 0: Understand the User
+
+Before searching for anything, build a profile of what this specific user cares about. This phase runs ONCE on first use and is cached for future runs. If a preferences file already exists, skip to Phase 0D.
+
+#### Phase 0A: Read Claude Code Memory
+
+Use the **Glob** tool to find all MEMORY.md files in the user's Claude Code memory:
+```
+~/.claude/projects/**/memory/MEMORY.md
+```
+
+Read each MEMORY.md file found. Extract:
+- **Role** — Are they a student, founder, engineer, researcher, PM?
+- **Domain** — What field are they in? (robotics, fintech, SaaS, ML research, etc.)
+- **Tech stack** — What languages, frameworks, and tools do they use?
+- **Active projects** — What are they building right now?
+- **Interests** — What topics come up repeatedly across their projects?
+
+Also glob for any individual memory files:
+```
+~/.claude/projects/**/memory/*.md
+```
+Scan these for additional context (project details, preferences, areas of expertise).
+
+#### Phase 0B: Read GitHub Signals
+
+Run these **Bash** commands in parallel:
+```bash
+gh api user --jq '{login, bio, company, blog}'
+```
+```bash
+gh api user/starred --per-page=50 --jq '.[].full_name'
+```
+
+From the GitHub data, extract:
+- **Bio/company** — professional identity
+- **Starred repos** — what tools, frameworks, and projects they follow. Group stars by theme (e.g., "12 AI/ML repos, 8 Rust repos, 5 DevOps repos").
+
+#### Phase 0C: Synthesize Interest Profile
+
+Combine memory + GitHub signals into an **interest profile** — a ranked list of topic tags with weights. Example:
+
+```
+Interest Profile:
+1. robotics, embodied-ai, physical-ai (HIGH — active startup in this space)
+2. agent-architectures, langgraph, tool-use (HIGH — building coding agents)
+3. ml-research, training-data, computer-vision (HIGH — ML coursework + startup)
+4. startups, fundraising, developer-tools (MEDIUM — founder, building products)
+5. infrastructure, data-pipelines, deployment (MEDIUM — building data platform)
+6. typescript, python, next.js, fastapi (CONTEXT — tech stack signals)
+```
+
+The weights are:
+- **HIGH** — actively working in this area (from projects and memory)
+- **MEDIUM** — shows clear interest (from GitHub stars, coursework)
+- **CONTEXT** — tech stack they use (useful for filtering developer tool stories)
+
+#### Phase 0D: Save Preferences
+
+Write the interest profile to `~/.news-briefing/profile.json` using the **Write** tool:
+
+```json
+{
+  "generated_at": "ISO-8601-timestamp",
+  "interests": [
+    { "tags": ["robotics", "embodied-ai", "physical-ai"], "weight": "high", "reason": "active startup building robot training platform" },
+    { "tags": ["agent-architectures", "langgraph", "tool-use"], "weight": "high", "reason": "building LangGraph-based coding agents" }
+  ],
+  "tech_stack": ["typescript", "python", "next.js", "react", "fastapi", "langgraph", "tailwind"],
+  "role": "student-founder",
+  "sources": ["claude-memory", "github-stars"]
+}
+```
+
+On future runs, read this file first. If it exists and is less than 30 days old, skip Phase 0A-0C and use the cached profile. If it's stale or missing, regenerate it.
+
+#### How the profile shapes search
+
+The interest profile directly influences Phases 1 and 2:
+- **Phase 1**: When fetching feeds, prioritize sources aligned with HIGH-weight interests. For a user interested in robotics + agents, fetch ArXiv cs.RO, HN, and TLDR AI rather than Product Hunt or TLDR Crypto.
+- **Phase 2**: When curating the final 5, score stories higher if they match HIGH-weight interest tags. A story about a new robotics dataset should beat a generic Apple hardware launch for a user whose startup is in that space.
+- **Explicit topic override**: If the user types `/news crypto`, the explicit topic OVERRIDES the profile for that run. But if they just type `/news` with no topic, the profile IS the topic.
+
 ### Phase 1: Source from High-Signal Feeds
 
 Do NOT start with generic web searches. Instead, go directly to the places where smart, technical people actually find news. Use **WebFetch** and **WebSearch** in parallel to pull from these community-vetted sources.
