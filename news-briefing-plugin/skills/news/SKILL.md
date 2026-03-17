@@ -203,6 +203,19 @@ Use the template structure below. Replace ALL placeholder content with real data
 - Write editorial-quality summaries — not copy-pasted article text. Rewrite in your own voice with a point of view.
 - The hero story (#1) gets a full lede paragraph. Cards (#2-4) get a headline + one-line summary. The feature story (#5) gets a lede paragraph.
 
+**Nav tabs — generated from user profile:**
+- The first tab is always **"For You"** (active by default). This is the main briefing.
+- Generate 3-4 additional tabs from the user's HIGH-weight interest tags from Phase 0.
+- Pick the most distinct, readable labels. Map interest tags to short display names:
+  - `["robotics", "embodied-ai"]` → "Robotics"
+  - `["agent-architectures", "langgraph"]` → "Agents & LLMs"
+  - `["ml-research", "training-data"]` → "ML Research"
+  - `["startups", "fundraising"]` → "Startups"
+  - `["crypto", "defi"]` → "Crypto"
+  - `["infrastructure", "deployment"]` → "Infrastructure"
+- These tabs are cosmetic for now (no filtering behavior). They signal to the user that the briefing is personalized to their interests. The "For You" tab is active and shows all 5 stories.
+- If no profile exists (Phase 0 was skipped or failed), fall back to: "For You", "AI", "Tech", "Markets"
+
 ### Phase 6: Open in Browser
 
 Run this command with the **Bash** tool:
@@ -450,8 +463,13 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
     <div class="nav-brand">The AI<span> Briefing</span></div>
     <ul class="nav-links">
       <a href="#" class="active">For You</a>
-      <a href="#">Top</a>
-      <a href="#">Markets</a>
+      <!-- Generate 3-4 tabs from user's HIGH-weight interest tags -->
+      <!-- Example for a robotics/agents/ML user: -->
+      <!-- <a href="#">Robotics</a> -->
+      <!-- <a href="#">Agents & LLMs</a> -->
+      <!-- <a href="#">ML Research</a> -->
+      <!-- <a href="#">Startups</a> -->
+      {{NAV_TABS}}
     </ul>
   </div>
 </div>
