@@ -8,11 +8,11 @@ argument-hint: [topic]
 
 Generate an editorially curated news briefing on a given topic (or general tech/AI news if no topic is provided) and output it as a self-contained HTML page that opens in the browser.
 
-The output is a dark-themed editorial page with:
-- A hero story (headline + image side-by-side)
-- A 3-card grid with real images
-- A feature story with editorial lede
-- A sticky sidebar with live market data and trending companies
+The output is a dark-themed editorial page inspired by Bloomberg and WSJ, with:
+- A Bloomberg-style horizontal ticker bar with live market indices and story-relevant stock tickers
+- A WSJ-style hero zone: dominant headline on the left, stacked secondary stories on the right
+- Editorial labels on each story (NEW RELEASE, ANALYSIS, DEEP DIVE, GTC 2026, etc.)
+- A lower section with two feature stories and a "Latest" sidebar feed
 - Real links to source articles
 - Real images pulled from article og:image tags
 
@@ -90,45 +90,102 @@ Write the interest profile to `~/.news-briefing/profile.json` using the **Write*
   ],
   "tech_stack": ["typescript", "python", "next.js", "react", "fastapi", "langgraph", "tailwind"],
   "role": "student-founder",
-  "sources": ["claude-memory", "github-stars"]
+  "sources": ["claude-memory", "github-stars"],
+  "domain_sources": []
 }
 ```
 
-On future runs, read this file first. If it exists and is less than 30 days old, skip Phase 0A-0C and use the cached profile. If it's stale or missing, regenerate it.
+The `domain_sources` field starts empty and is populated by Phase 0.5 after the first run.
+
+On future runs, read this file first. If it exists and is less than 30 days old, skip Phase 0A-0C and use the cached profile. If `domain_sources` is already populated, also skip Phase 0.5.
 
 #### How the profile shapes search
 
-The interest profile directly influences Phases 1 and 2:
-- **Phase 1**: When fetching feeds, prioritize sources aligned with HIGH-weight interests. For a user interested in robotics + agents, fetch ArXiv cs.RO, HN, and TLDR AI rather than Product Hunt or TLDR Crypto.
-- **Phase 2**: When curating the final 5, score stories higher if they match HIGH-weight interest tags. A story about a new robotics dataset should beat a generic Apple hardware launch for a user whose startup is in that space.
+The interest profile directly influences Phase 0.5, Phase 1, and Phase 2:
+- **Phase 0.5**: The profile's HIGH-weight interest tags are used to discover domain-specific high-signal sources dynamically.
+- **Phase 1**: Fetch from both universal feeds AND the domain-specific sources discovered in Phase 0.5.
+- **Phase 2**: Score stories higher if they match HIGH-weight interest tags.
 - **Explicit topic override**: If the user types `/news crypto`, the explicit topic OVERRIDES the profile for that run. But if they just type `/news` with no topic, the profile IS the topic.
+
+### Phase 0.5: Discover Domain-Specific Sources
+
+This is the key step that makes the briefing genuinely personalized. Different professionals read different sources — a bioinformatician reads Nature and bioRxiv, not Product Hunt. An algo trader reads Matt Levine and FT, not Lobsters.
+
+#### Step 0.5A: Search for high-signal sources
+
+Using the HIGH-weight interest tags from the user profile, run **WebSearch** queries in parallel to discover what sources experts in those domains actually read:
+
+For each HIGH-weight interest cluster, search:
+- `"best news sources for {domain} professionals high signal"`
+- `"where do {domain} experts get their news reddit"`
+- `"top {domain} newsletters blogs publications 2025 2026"`
+
+Examples of what these searches should surface:
+
+| Domain | Expected high-signal sources |
+|---|---|
+| Bioinformatics / Biotech | Nature, bioRxiv, STAT News, Endpoints News, FierceBiotech, PubMed Trending |
+| Algo Trading / Quant | Bloomberg, Financial Times, Matt Levine (Money Stuff), QuantNews, r/algotrading, Risk.net |
+| Open Source / Law | EFF, Ars Technica Policy, TechDirt, LawFare Blog, SCOTUSblog |
+| Robotics | IEEE Spectrum, ArXiv cs.RO, The Robot Report, Hackaday, IO Rodeo |
+| Climate / Energy | Carbon Brief, Canary Media, Utility Dive, BloombergNEF |
+| Cybersecurity | Krebs on Security, The Record, Risky Business, Dark Reading |
+| Game Dev | Gamasutra, IGN, RPS, itch.io devlogs |
+
+#### Step 0.5B: Validate and select sources
+
+From the search results, pick **3-5 domain-specific sources** that:
+1. Have a fetchable front page or recent articles list (not paywalled RSS-only)
+2. Are recognized by the professional community (appear in multiple search results)
+3. Publish frequently enough to have current content
+
+#### Step 0.5C: Cache the sources
+
+Add the discovered sources to the user's `~/.news-briefing/profile.json` under a new `domain_sources` field:
+
+```json
+{
+  "domain_sources": [
+    { "url": "https://www.nature.com/news", "name": "Nature News", "domain": "bioinformatics" },
+    { "url": "https://www.biorxiv.org/", "name": "bioRxiv", "domain": "bioinformatics" },
+    { "url": "https://www.statnews.com/", "name": "STAT News", "domain": "biotech" }
+  ]
+}
+```
+
+On future runs, if `domain_sources` already exists in the cached profile, skip this phase and use the cached sources directly.
 
 ### Phase 1: Source from High-Signal Feeds
 
-Do NOT start with generic web searches. Instead, go directly to the places where smart, technical people actually find news. Use **WebFetch** and **WebSearch** in parallel to pull from these community-vetted sources.
+Fetch from TWO categories of sources in parallel: **universal feeds** (tech community at large) and **domain-specific feeds** (from Phase 0.5).
 
-#### Step 1A: Fetch community feeds (run ALL in parallel)
+#### Step 1A: Fetch universal feeds (run ALL in parallel)
 
-Use **WebFetch** on these URLs to get the current front pages:
+These are always fetched regardless of topic or user profile:
 
-**Always fetch (regardless of topic):**
 - `https://news.ycombinator.com/front` — Hacker News front page. Extract story titles, source domains, point counts, comment counts. Stories with 300+ points are high-signal.
 - `https://techmeme.com/` — Techmeme river. Algorithmically curated tech news. Extract headlines and source outlets.
 
-**For AI/ML topics, also fetch:**
-- `https://tldr.tech/ai` — TLDR AI newsletter. Latest curated AI stories.
-- `https://arxiv.org/list/cs.AI/recent` — Recent ArXiv papers. Only pick papers with real-world implications, not pure theory.
+#### Step 1A.5: Fetch domain-specific feeds (run ALL in parallel with Step 1A)
 
-**For crypto topics, also fetch:**
-- `https://tldr.tech/crypto` — TLDR Crypto newsletter.
-- `https://www.theblock.co/latest` — The Block latest.
+Fetch the front pages of ALL sources from Phase 0.5's `domain_sources` list. For each, extract story titles, URLs, and any engagement signals.
 
-**For general tech, also fetch:**
-- `https://tldr.tech/` — TLDR Tech newsletter.
-- `https://lobste.rs/` — Lobsters front page. More niche/technical than HN.
+Additionally, based on the user's interest profile, fetch relevant specialty feeds:
 
-**For startups/products, also fetch:**
-- `https://www.producthunt.com/` — Product Hunt front page.
+**For AI/ML interests:**
+- `https://tldr.tech/ai` — TLDR AI newsletter
+- `https://arxiv.org/list/cs.AI/recent` — Recent ArXiv AI papers
+
+**For crypto interests:**
+- `https://tldr.tech/crypto` — TLDR Crypto
+- `https://www.theblock.co/latest` — The Block
+
+**For general tech interests:**
+- `https://tldr.tech/` — TLDR Tech
+- `https://lobste.rs/` — Lobsters
+
+**For startup/product interests:**
+- `https://www.producthunt.com/` — Product Hunt
 
 For each feed, extract story titles, URLs, and any engagement signals (points, comments, upvotes).
 
@@ -148,14 +205,18 @@ Combine all results from 1A and 1B into a single pool. You should have 30-50 raw
 
 ### Phase 2: Editorial Curation
 
-From the scored pool, select exactly **5 stories** using these criteria (in priority order):
+From the scored pool, select exactly **5 stories** for the main layout, plus **~6 additional stories** for the "Latest" sidebar feed.
+
+**Main 5 stories** — use these criteria (in priority order):
 
 1. **Cross-source signal** — Stories that appear across multiple high-signal feeds (HN + Techmeme, HN + TLDR, etc.) get priority. This is the strongest quality signal.
 2. **Community engagement** — High point counts, comment counts, and upvotes indicate the story resonated with a technical audience.
 3. **Significance** — Does this actually matter? Will people still be talking about it next week? Prefer stories that change something (new capability, policy shift, market move) over incremental updates.
 4. **Uniqueness** — Each story must cover a distinct angle. Drop duplicates and rehashes. If two stories cover the same event, pick the better source.
-5. **Surprise factor** — Prefer stories that are genuinely interesting or counterintuitive over predictable press releases. The robot dogs story is more interesting than "Company X raises $Y million."
+5. **Surprise factor** — Prefer stories that are genuinely interesting or counterintuitive over predictable press releases.
 6. **Diversity** — Cover different facets (e.g., for tech: a deep technical post, a policy/business story, a tool/product, a cultural moment, an infrastructure play).
+
+**"Latest" sidebar stories** — pick 6 additional stories from the pool that didn't make the main 5 but are still interesting. These only need a headline, source, and approximate time. Include HN point counts or comment counts where available as social proof.
 
 **What to avoid:**
 - Generic fundraising announcements (unless the amount or implications are genuinely significant)
@@ -163,13 +224,22 @@ From the scored pool, select exactly **5 stories** using these criteria (in prio
 - SEO-driven blog posts with no original reporting
 - Stories that are just repackaging a press release
 
-Rank the final 5 stories 1-5 by significance. Story #1 gets hero treatment.
+Rank the main 5 stories 1-5 by significance. Story #1 gets hero treatment. Stories #2-3 go in the hero sidebar. Stories #4-5 get the lower feature treatment.
+
+**Editorial labels** — assign each main story a label that tells readers what kind of content it is:
+- `NEW RELEASE` — product or model launches
+- `ANALYSIS` — deeper takes with implications
+- `DEEP DIVE` — technical or investigative pieces
+- `EXCLUSIVE` — scoops or first reports
+- `POLICY` — regulatory, legal, or government stories
+- Or a relevant event name like `GTC 2026`, `WWDC`, etc.
+Do NOT use "BREAKING" unless something literally just happened in the last hour.
 
 **For source linking:** When a story originated from a community feed (HN, Lobsters), link to the **original source article**, not the discussion thread. But note the community engagement (e.g., "654 points on HN") in the editorial lede if it adds context.
 
 ### Phase 3: Deep Content Fetch
 
-For each of the 5 selected stories, use **WebFetch** in parallel to:
+For each of the 5 main stories, use **WebFetch** in parallel to:
 
 1. Fetch the article page and extract:
    - The `og:image` meta tag URL (for the real article image)
@@ -181,14 +251,46 @@ If an og:image cannot be found for a story, try fetching a related article on th
 
 ### Phase 4: Market Data Fetch
 
-Use **WebSearch** and **WebFetch** to pull real market data:
+This phase has two parts: **index data** and **dynamic ticker extraction**.
 
-1. Search for current prices of indices relevant to the topic:
-   - For tech/AI: S&P 500, NASDAQ, Bitcoin, VIX
-   - For crypto: BTC, ETH, SOL, Total Market Cap
-   - For other topics: pick 4 relevant market indicators
+#### Step 4A: Extract tickers from stories
 
-2. Search for stock prices of 5 companies mentioned in or related to the stories. Use **WebFetch** on `stockanalysis.com/stocks/{TICKER}/` to get real prices and day changes.
+After selecting the 5 main stories, identify **every publicly traded company** mentioned in or directly related to the stories. For each, determine its stock ticker symbol.
+
+Examples:
+- Story about OpenAI → no public ticker (skip), but Microsoft (MSFT) is a major investor → include MSFT
+- Story about Google Personal Intelligence → GOOG
+- Story about Nvidia GTC → NVDA
+- Story about Kalshi → no public ticker, but could include related companies
+
+Collect up to **8 tickers** from the stories. If fewer than 4 are found, pad with major tech names (AAPL, MSFT, GOOG, META, NVDA, AMZN, TSLA) that are contextually relevant.
+
+#### Step 4B: Fetch exact index values
+
+Use **WebFetch** in parallel on Google Finance pages to get **exact, current index values**:
+
+- `https://www.google.com/finance/quote/.INX:INDEXSP` — S&P 500 (extract exact value like `6,716.09` and day change)
+- `https://www.google.com/finance/quote/.IXIC:INDEXNASDAQ` — NASDAQ Composite (extract exact value and day change)
+
+Also fetch **WebFetch** on these for Bitcoin and other relevant indicators:
+- `https://www.google.com/finance/quote/BTC-USD` — Bitcoin price
+
+If Google Finance pages fail or don't return data, fall back to **WebSearch** for `"S&P 500 price today"` etc.
+
+#### Step 4C: Fetch individual stock prices
+
+For each ticker from Step 4A, use **WebFetch** in parallel on:
+- `https://www.google.com/finance/quote/{TICKER}:NASDAQ` or
+- `https://www.google.com/finance/quote/{TICKER}:NYSE`
+
+Extract: current price, day change amount, day change percentage.
+
+If Google Finance fails for a ticker, fall back to `https://stockanalysis.com/stocks/{TICKER}/`.
+
+**Critical rules:**
+- Never fabricate financial data. If you can't fetch a real price, omit that ticker.
+- Use exact values (e.g., `6,716.09` not `Flat`). Show the actual index number.
+- Include both the value and the percentage change with colored up/down badges.
 
 ### Phase 5: Generate HTML
 
@@ -201,20 +303,20 @@ Use the template structure below. Replace ALL placeholder content with real data
 - Every `<img src>` must use the real og:image URL from Phase 3
 - Every stock price, percentage, and index value must be real data from Phase 4
 - Write editorial-quality summaries — not copy-pasted article text. Rewrite in your own voice with a point of view.
-- The hero story (#1) gets a full lede paragraph. Cards (#2-4) get a headline + one-line summary. The feature story (#5) gets a lede paragraph.
+- Story #1 gets a full lede paragraph in the hero. Stories #2-3 get headline + short lede in the hero sidebar. Stories #4-5 get the lower feature treatment with images + ledes.
 
-**Nav tabs — generated from user profile:**
-- The first tab is always **"For You"** (active by default). This is the main briefing.
-- Generate 3-4 additional tabs from the user's HIGH-weight interest tags from Phase 0.
-- Pick the most distinct, readable labels. Map interest tags to short display names:
-  - `["robotics", "embodied-ai"]` → "Robotics"
-  - `["agent-architectures", "langgraph"]` → "Agents & LLMs"
-  - `["ml-research", "training-data"]` → "ML Research"
-  - `["startups", "fundraising"]` → "Startups"
-  - `["crypto", "defi"]` → "Crypto"
-  - `["infrastructure", "deployment"]` → "Infrastructure"
-- These tabs are cosmetic for now (no filtering behavior). They signal to the user that the briefing is personalized to their interests. The "For You" tab is active and shows all 5 stories.
-- If no profile exists (Phase 0 was skipped or failed), fall back to: "For You", "AI", "Tech", "Markets"
+**Nav:**
+- Only show a single **"For You"** tab (active). Do NOT generate additional tabs. Keep the nav clean and minimal.
+- Show the current date on the right side of the nav.
+
+**Ticker bar:**
+- Horizontal bar above the nav with all market data.
+- Show 3-4 index values (S&P 500, Nasdaq, Bitcoin, plus one more relevant to the topic) with exact values and colored change badges.
+- Then show the dynamically extracted stock tickers from the stories.
+- Each item shows: label, exact value, and colored percentage change badge.
+
+**Sidebar:**
+- The "Latest" sidebar shows ~6 additional headlines from the story pool with relative timestamps (e.g., "2h ago", "4h ago"), headline text, and source attribution with engagement signals.
 
 ### Phase 6: Open in Browser
 
@@ -239,19 +341,21 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{BRIEFING_TITLE}}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,700;0,800;1,400&family=Source+Serif+4:ital,wght@0,400;0,500;1,400&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,700;0,800;0,900;1,400&family=Source+Serif+4:ital,wght@0,400;0,500;1,400&display=swap');
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
-      --bg: #0f0f0f;
-      --surface: #1a1a1a;
-      --surface-2: #222;
-      --text: #e8e5e0;
-      --text-sub: #b0aba3;
-      --text-muted: #666;
-      --border: #2a2a2a;
+      --bg: #0a0a0a;
+      --surface: #141414;
+      --surface-2: #1c1c1c;
+      --text: #ede9e3;
+      --text-sub: #a8a29e;
+      --text-muted: #57534e;
+      --border: #1f1f1f;
+      --border-light: #292524;
       --accent: #d4a574;
+      --accent-dim: rgba(212,165,116,0.12);
       --green: #4ade80;
       --red: #f87171;
       --sans: 'Inter', -apple-system, sans-serif;
@@ -267,7 +371,56 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
     }
     a { color: inherit; text-decoration: none; }
 
-    /* Nav */
+    /* ── Ticker Bar (Bloomberg-style) ── */
+    .ticker-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .ticker-inner {
+      display: flex;
+      align-items: center;
+      height: 36px;
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 0 2rem;
+      gap: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .ticker-inner::-webkit-scrollbar { display: none; }
+    .ticker-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0 1.25rem;
+      border-right: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .ticker-item:last-child { border-right: none; }
+    .ticker-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      letter-spacing: 0.03em;
+    }
+    .ticker-value {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+    .ticker-change {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 3px;
+    }
+    .ticker-change.up { color: var(--green); background: rgba(74,222,128,0.1); }
+    .ticker-change.down { color: var(--red); background: rgba(248,113,113,0.1); }
+
+    /* ── Nav ── */
     .nav {
       position: sticky; top: 0; z-index: 100;
       background: var(--bg);
@@ -275,300 +428,431 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
       padding: 0 2rem;
     }
     .nav-inner {
-      max-width: 1200px; margin: 0 auto;
+      max-width: 1300px; margin: 0 auto;
       display: flex; align-items: center; justify-content: space-between;
-      height: 52px;
+      height: 56px;
     }
     .nav-brand {
       font-family: var(--serif);
-      font-size: 1.1rem; font-weight: 700;
+      font-size: 1.35rem; font-weight: 800;
+      letter-spacing: -0.01em;
     }
     .nav-brand span { color: var(--accent); }
-    .nav-links { display: flex; gap: 0; list-style: none; }
-    .nav-links a {
-      display: block; padding: 0.9rem 1rem;
-      font-size: 0.78rem; font-weight: 500;
+    .nav-right {
+      display: flex; align-items: center; gap: 1.5rem;
+    }
+    .nav-tab {
+      font-size: 0.72rem; font-weight: 600;
+      color: var(--text);
+      padding: 0.5rem 0;
+      border-bottom: 2px solid var(--accent);
+    }
+    .nav-date {
+      font-size: 0.68rem;
       color: var(--text-muted);
-      transition: color 0.15s;
-      border-bottom: 2px solid transparent;
+      font-weight: 500;
     }
-    .nav-links a:hover { color: var(--text); }
-    .nav-links a.active { color: var(--text); border-bottom-color: var(--accent); }
 
-    /* Layout */
+    /* ── Layout ── */
     .layout {
-      max-width: 1200px; margin: 0 auto;
-      padding: 1.5rem 2rem;
-      display: grid; grid-template-columns: 1fr 300px; gap: 2rem;
+      max-width: 1300px; margin: 0 auto;
+      padding: 0 2rem;
     }
 
-    /* Hero */
-    .hero {
-      display: grid; grid-template-columns: 1fr 1.2fr; gap: 1.75rem;
-      align-items: center;
-      padding-bottom: 1.75rem;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 1.75rem;
+    /* ── Hero Zone (WSJ-style: big headline + side stories) ── */
+    .hero-zone {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 0;
+      border-bottom: 1px solid var(--border-light);
+      padding: 2rem 0;
     }
-    .hero-text .time {
-      font-size: 0.68rem; color: var(--text-muted);
-      margin-bottom: 0.75rem;
-      display: flex; align-items: center; gap: 0.4rem;
+    .hero-main {
+      padding-right: 2.5rem;
+      border-right: 1px solid var(--border-light);
     }
-    .hero-text .time::before {
-      content: ''; width: 5px; height: 5px;
-      background: var(--accent); border-radius: 50%;
+
+    /* Editorial labels */
+    .label {
+      display: inline-block;
+      font-size: 0.6rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 3px;
+      margin-bottom: 1rem;
     }
-    .hero h1 {
+    .label-breaking { color: var(--red); border: 1px solid var(--red); }
+    .label-analysis { color: var(--accent); border: 1px solid var(--accent); }
+    .label-deepdive { color: #818cf8; border: 1px solid #818cf8; }
+    .label-exclusive { color: var(--green); border: 1px solid var(--green); }
+    .label-policy { color: #f59e0b; border: 1px solid #f59e0b; }
+
+    .hero-main h1 {
       font-family: var(--serif);
-      font-size: 1.85rem; font-weight: 700; line-height: 1.22;
-      color: var(--text); margin-bottom: 0.85rem;
+      font-size: 2.6rem;
+      font-weight: 900;
+      line-height: 1.12;
+      color: var(--text);
+      margin-bottom: 1rem;
+      letter-spacing: -0.02em;
       transition: color 0.2s;
     }
-    .hero a:hover h1 { color: var(--accent); }
-    .hero .lede {
+    .hero-main a:hover h1 { color: var(--accent); }
+
+    .hero-main .hero-img {
+      width: 100%;
+      aspect-ratio: 16/9;
+      object-fit: cover;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+    }
+
+    .hero-main .lede {
       font-family: var(--body-serif);
-      font-size: 0.92rem; color: var(--text-sub); line-height: 1.75;
+      font-size: 1rem;
+      color: var(--text-sub);
+      line-height: 1.7;
       margin-bottom: 0.75rem;
+      max-width: 600px;
     }
-    .hero .sources { font-size: 0.62rem; color: var(--text-muted); }
-    .hero-img {
-      width: 100%; aspect-ratio: 4/3;
-      object-fit: cover; border-radius: 10px; display: block;
+    .hero-main .meta {
+      font-size: 0.6rem;
+      color: var(--text-muted);
     }
 
-    /* Card grid */
-    .cards {
-      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.25rem;
-      padding-bottom: 1.75rem;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 1.75rem;
+    /* ── Hero Sidebar (secondary stories stacked) ── */
+    .hero-sidebar {
+      padding-left: 2rem;
+      display: flex;
+      flex-direction: column;
     }
-    .card { display: block; transition: transform 0.2s; }
-    .card:hover { transform: translateY(-3px); }
-    .card-img-wrap { border-radius: 10px; overflow: hidden; margin-bottom: 0.85rem; }
-    .card img {
-      width: 100%; aspect-ratio: 16/10;
-      object-fit: cover; display: block;
-      transition: transform 0.4s;
+    .hero-side-story {
+      display: block;
+      padding: 1.25rem 0;
+      border-bottom: 1px solid var(--border-light);
+      transition: background 0.15s;
     }
-    .card:hover img { transform: scale(1.04); }
-    .card h3 {
+    .hero-side-story:first-child { padding-top: 0; }
+    .hero-side-story:last-child { border-bottom: none; }
+    .hero-side-story h3 {
       font-family: var(--serif);
-      font-size: 1rem; font-weight: 700; line-height: 1.35;
-      color: var(--text); margin-bottom: 0.5rem;
+      font-size: 1.05rem;
+      font-weight: 700;
+      line-height: 1.3;
+      color: var(--text);
+      margin-bottom: 0.5rem;
       transition: color 0.2s;
     }
-    .card:hover h3 { color: var(--accent); }
-    .card .card-meta { font-size: 0.6rem; color: var(--text-muted); }
-
-    /* Feature story */
-    .feature {
-      display: grid; grid-template-columns: 1fr 1.4fr; gap: 1.5rem;
-      align-items: center; padding-bottom: 1.75rem;
-    }
-    .feature-img {
-      width: 100%; aspect-ratio: 4/3;
-      object-fit: cover; border-radius: 10px; display: block;
-    }
-    .feature .time { font-size: 0.65rem; color: var(--text-muted); margin-bottom: 0.5rem; }
-    .feature h2 {
-      font-family: var(--serif);
-      font-size: 1.4rem; font-weight: 700; line-height: 1.25;
-      color: var(--text); margin-bottom: 0.65rem;
-      transition: color 0.2s;
-    }
-    .feature a:hover h2 { color: var(--accent); }
-    .feature .lede {
+    .hero-side-story:hover h3 { color: var(--accent); }
+    .hero-side-story .side-lede {
       font-family: var(--body-serif);
-      font-size: 0.88rem; color: var(--text-sub); line-height: 1.7;
+      font-size: 0.82rem;
+      color: var(--text-sub);
+      line-height: 1.6;
+      margin-bottom: 0.4rem;
     }
-    .feature .sources { font-size: 0.6rem; color: var(--text-muted); margin-top: 0.6rem; }
-
-    /* Sidebar */
-    .sidebar { position: sticky; top: 68px; align-self: start; }
-    .sidebar-section {
-      background: var(--surface); border-radius: 12px;
-      border: 1px solid var(--border); padding: 1.25rem;
-      margin-bottom: 1.25rem;
+    .hero-side-story .meta {
+      font-size: 0.58rem;
+      color: var(--text-muted);
     }
-    .sidebar-title { font-size: 0.78rem; font-weight: 700; margin-bottom: 1rem; }
 
-    .market-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-    .market-card { background: var(--surface-2); border-radius: 8px; padding: 0.75rem; }
-    .market-name { font-size: 0.65rem; font-weight: 600; color: var(--text-sub); }
-    .market-price { font-size: 0.82rem; font-weight: 700; margin: 0.1rem 0; }
-    .market-change { font-size: 0.65rem; font-weight: 600; }
-    .market-change.up { color: var(--green); }
-    .market-change.down { color: var(--red); }
-    .market-spark { margin-top: 0.4rem; height: 24px; }
-    .market-spark svg { width: 100%; height: 100%; }
-    .spark-line { fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-    .spark-green { stroke: var(--green); }
-    .spark-red { stroke: var(--red); }
-
-    .trending-item {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0.65rem 0; border-bottom: 1px solid var(--border);
+    /* ── Lower Grid (3 col: feature + story + latest sidebar) ── */
+    .lower-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr 300px;
+      gap: 0;
+      padding: 1.75rem 0;
+      border-bottom: 1px solid var(--border-light);
     }
-    .trending-item:last-child { border-bottom: none; }
-    .trending-left { display: flex; align-items: center; gap: 0.65rem; }
-    .trending-icon {
-      width: 32px; height: 32px; border-radius: 8px;
-      background: var(--surface-2);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 0.7rem; font-weight: 700; color: var(--accent);
-    }
-    .trending-name { font-size: 0.75rem; font-weight: 600; }
-    .trending-ticker { font-size: 0.6rem; color: var(--text-muted); }
-    .trending-right { text-align: right; }
-    .trending-price { font-size: 0.75rem; font-weight: 600; }
-    .trending-pct { font-size: 0.62rem; font-weight: 600; }
-    .trending-pct.up { color: var(--green); }
-    .trending-pct.down { color: var(--red); }
 
-    /* Colophon */
+    .lower-feature {
+      padding-right: 2rem;
+      border-right: 1px solid var(--border-light);
+    }
+    .lower-feature .feature-img {
+      width: 100%;
+      aspect-ratio: 16/10;
+      object-fit: cover;
+      border-radius: 5px;
+      margin-bottom: 1rem;
+    }
+    .lower-feature h2 {
+      font-family: var(--serif);
+      font-size: 1.35rem;
+      font-weight: 700;
+      line-height: 1.25;
+      color: var(--text);
+      margin-bottom: 0.6rem;
+      transition: color 0.2s;
+    }
+    .lower-feature a:hover h2 { color: var(--accent); }
+    .lower-feature .lede {
+      font-family: var(--body-serif);
+      font-size: 0.85rem;
+      color: var(--text-sub);
+      line-height: 1.65;
+      margin-bottom: 0.5rem;
+    }
+    .lower-feature .meta {
+      font-size: 0.58rem;
+      color: var(--text-muted);
+    }
+
+    .lower-mid {
+      padding: 0 2rem;
+      border-right: 1px solid var(--border-light);
+    }
+    .lower-mid .mid-img {
+      width: 100%;
+      aspect-ratio: 16/10;
+      object-fit: cover;
+      border-radius: 5px;
+      margin-bottom: 1rem;
+    }
+    .lower-mid h2 {
+      font-family: var(--serif);
+      font-size: 1.35rem;
+      font-weight: 700;
+      line-height: 1.25;
+      color: var(--text);
+      margin-bottom: 0.6rem;
+      transition: color 0.2s;
+    }
+    .lower-mid a:hover h2 { color: var(--accent); }
+    .lower-mid .lede {
+      font-family: var(--body-serif);
+      font-size: 0.85rem;
+      color: var(--text-sub);
+      line-height: 1.65;
+      margin-bottom: 0.5rem;
+    }
+    .lower-mid .meta {
+      font-size: 0.58rem;
+      color: var(--text-muted);
+    }
+
+    /* ── Sidebar: Latest ── */
+    .lower-sidebar {
+      padding-left: 1.5rem;
+    }
+    .sidebar-title {
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 1rem;
+    }
+
+    .latest-item {
+      display: block;
+      padding: 0.7rem 0;
+      border-bottom: 1px solid var(--border);
+      transition: opacity 0.15s;
+    }
+    .latest-item:last-child { border-bottom: none; }
+    .latest-item:hover { opacity: 0.8; }
+    .latest-time {
+      font-size: 0.58rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 0.3rem;
+    }
+    .latest-headline {
+      font-family: var(--sans);
+      font-size: 0.78rem;
+      font-weight: 600;
+      line-height: 1.4;
+      color: var(--text);
+    }
+    .latest-source {
+      font-size: 0.55rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+
+    /* ── Colophon ── */
     .colophon {
-      grid-column: 1 / -1;
-      border-top: 1px solid var(--border);
-      padding: 1.5rem 0 2rem;
-      font-size: 0.6rem; color: var(--text-muted); text-align: center;
+      padding: 2rem 0 2.5rem;
+      font-size: 0.58rem;
+      color: var(--text-muted);
+      text-align: center;
+      line-height: 1.8;
     }
     .colophon a { color: var(--accent); }
 
-    /* Responsive */
-    @media (max-width: 960px) {
-      .layout { grid-template-columns: 1fr; }
-      .sidebar { position: static; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-      .hero { grid-template-columns: 1fr; }
-      .hero-img { order: -1; }
-      .cards { grid-template-columns: 1fr; }
-      .feature { grid-template-columns: 1fr; }
-      .feature-img { order: -1; }
+    /* ── Responsive ── */
+    @media (max-width: 1060px) {
+      .hero-zone { grid-template-columns: 1fr; }
+      .hero-main { padding-right: 0; border-right: none; border-bottom: 1px solid var(--border-light); padding-bottom: 1.5rem; }
+      .hero-sidebar { padding-left: 0; padding-top: 1.5rem; }
+      .lower-section { grid-template-columns: 1fr; }
+      .lower-feature { padding-right: 0; border-right: none; border-bottom: 1px solid var(--border-light); padding-bottom: 1.5rem; }
+      .lower-mid { padding: 1.5rem 0; border-right: none; border-bottom: 1px solid var(--border-light); }
+      .lower-sidebar { padding-left: 0; padding-top: 1.5rem; }
     }
     @media (max-width: 600px) {
-      .layout { padding: 1rem; }
+      .layout { padding: 0 1rem; }
       .nav { padding: 0 1rem; }
-      .hero h1 { font-size: 1.45rem; }
-      .sidebar { grid-template-columns: 1fr; }
-      .nav-links { display: none; }
+      .ticker-inner { padding: 0 1rem; }
+      .hero-main h1 { font-size: 1.8rem; }
+      .nav-date { display: none; }
     }
   </style>
 </head>
 <body>
 
-<!-- Nav -->
+<!-- ── Ticker Bar ── -->
+<div class="ticker-bar">
+  <div class="ticker-inner">
+    <!-- Index values first (3-4 indices with EXACT values) -->
+    {{INDEX_TICKER_ITEMS}}
+    <!-- Then story-relevant stock tickers (dynamically extracted) -->
+    {{STOCK_TICKER_ITEMS}}
+  </div>
+</div>
+
+<!-- ── Nav ── -->
 <div class="nav">
   <div class="nav-inner">
     <div class="nav-brand">The AI<span> Briefing</span></div>
-    <ul class="nav-links">
-      <a href="#" class="active">For You</a>
-      <!-- Generate 3-4 tabs from user's HIGH-weight interest tags -->
-      <!-- Example for a robotics/agents/ML user: -->
-      <!-- <a href="#">Robotics</a> -->
-      <!-- <a href="#">Agents & LLMs</a> -->
-      <!-- <a href="#">ML Research</a> -->
-      <!-- <a href="#">Startups</a> -->
-      {{NAV_TABS}}
-    </ul>
+    <div class="nav-right">
+      <span class="nav-tab">For You</span>
+      <span class="nav-date">{{FULL_DATE}}</span>
+    </div>
   </div>
 </div>
 
 <div class="layout">
-  <main>
 
-    <!-- HERO: Story #1 -->
-    <div class="hero">
-      <div class="hero-text">
-        <div class="time">{{STORY_1_TIME}}</div>
-        <a href="{{STORY_1_URL}}" target="_blank">
-          <h1>{{STORY_1_HEADLINE}}</h1>
-        </a>
-        <p class="lede">{{STORY_1_LEDE}}</p>
-        <div class="sources">{{STORY_1_SOURCE}} &middot; {{STORY_1_TIME_SHORT}}</div>
-      </div>
+  <!-- ── Hero Zone ── -->
+  <div class="hero-zone">
+    <div class="hero-main">
+      <div class="label {{STORY_1_LABEL_CLASS}}">{{STORY_1_LABEL}}</div>
+      <a href="{{STORY_1_URL}}" target="_blank">
+        <h1>{{STORY_1_HEADLINE}}</h1>
+      </a>
       <a href="{{STORY_1_URL}}" target="_blank">
         <img class="hero-img" src="{{STORY_1_IMAGE}}" alt="{{STORY_1_ALT}}">
       </a>
+      <p class="lede">{{STORY_1_LEDE}}</p>
+      <div class="meta">{{STORY_1_SOURCES}}</div>
     </div>
 
-    <!-- CARDS: Stories #2, #3, #4 -->
-    <div class="cards">
-      <a class="card" href="{{STORY_2_URL}}" target="_blank">
-        <div class="card-img-wrap">
-          <img src="{{STORY_2_IMAGE}}" alt="{{STORY_2_ALT}}">
-        </div>
+    <div class="hero-sidebar">
+      <!-- Story #2 -->
+      <a class="hero-side-story" href="{{STORY_2_URL}}" target="_blank">
+        <div class="label {{STORY_2_LABEL_CLASS}}">{{STORY_2_LABEL}}</div>
         <h3>{{STORY_2_HEADLINE}}</h3>
-        <div class="card-meta">{{STORY_2_SOURCE}} &middot; {{STORY_2_TIME}}</div>
+        <p class="side-lede">{{STORY_2_SHORT_LEDE}}</p>
+        <div class="meta">{{STORY_2_SOURCES}}</div>
       </a>
-      <a class="card" href="{{STORY_3_URL}}" target="_blank">
-        <div class="card-img-wrap">
-          <img src="{{STORY_3_IMAGE}}" alt="{{STORY_3_ALT}}">
-        </div>
+      <!-- Story #3 -->
+      <a class="hero-side-story" href="{{STORY_3_URL}}" target="_blank">
         <h3>{{STORY_3_HEADLINE}}</h3>
-        <div class="card-meta">{{STORY_3_SOURCE}} &middot; {{STORY_3_TIME}}</div>
+        <p class="side-lede">{{STORY_3_SHORT_LEDE}}</p>
+        <div class="meta">{{STORY_3_SOURCES}}</div>
       </a>
-      <a class="card" href="{{STORY_4_URL}}" target="_blank">
-        <div class="card-img-wrap">
-          <img src="{{STORY_4_IMAGE}}" alt="{{STORY_4_ALT}}">
-        </div>
-        <h3>{{STORY_4_HEADLINE}}</h3>
-        <div class="card-meta">{{STORY_4_SOURCE}} &middot; {{STORY_4_TIME}}</div>
+      <!-- Additional sidebar headlines from remaining pool (optional) -->
+      {{HERO_SIDEBAR_EXTRAS}}
+    </div>
+  </div>
+
+  <!-- ── Lower Section ── -->
+  <div class="lower-section">
+    <!-- Story #4 -->
+    <div class="lower-feature">
+      <div class="label {{STORY_4_LABEL_CLASS}}">{{STORY_4_LABEL}}</div>
+      <a href="{{STORY_4_URL}}" target="_blank">
+        <img class="feature-img" src="{{STORY_4_IMAGE}}" alt="{{STORY_4_ALT}}">
       </a>
+      <a href="{{STORY_4_URL}}" target="_blank">
+        <h2>{{STORY_4_HEADLINE}}</h2>
+      </a>
+      <p class="lede">{{STORY_4_LEDE}}</p>
+      <div class="meta">{{STORY_4_SOURCES}}</div>
     </div>
 
-    <!-- FEATURE: Story #5 -->
-    <div class="feature">
+    <!-- Story #5 -->
+    <div class="lower-mid">
+      <div class="label {{STORY_5_LABEL_CLASS}}">{{STORY_5_LABEL}}</div>
       <a href="{{STORY_5_URL}}" target="_blank">
-        <img class="feature-img" src="{{STORY_5_IMAGE}}" alt="{{STORY_5_ALT}}">
+        <img class="mid-img" src="{{STORY_5_IMAGE}}" alt="{{STORY_5_ALT}}">
       </a>
-      <div>
-        <div class="time">{{STORY_5_TIME}}</div>
-        <a href="{{STORY_5_URL}}" target="_blank">
-          <h2>{{STORY_5_HEADLINE}}</h2>
-        </a>
-        <p class="lede">{{STORY_5_LEDE}}</p>
-        <div class="sources">{{STORY_5_SOURCE}}</div>
-      </div>
+      <a href="{{STORY_5_URL}}" target="_blank">
+        <h2>{{STORY_5_HEADLINE}}</h2>
+      </a>
+      <p class="lede">{{STORY_5_LEDE}}</p>
+      <div class="meta">{{STORY_5_SOURCES}}</div>
     </div>
 
-  </main>
-
-  <!-- Sidebar -->
-  <aside class="sidebar">
-    <div class="sidebar-section">
-      <div class="sidebar-title">Market Outlook</div>
-      <div class="market-grid">
-        <!-- 4 market cards with real data. For each: -->
-        <!-- Use spark-green class for positive, spark-red for negative -->
-        <!-- Generate a plausible SVG polyline for the sparkline based on the direction -->
-        {{MARKET_CARDS}}
-      </div>
+    <!-- Latest sidebar -->
+    <div class="lower-sidebar">
+      <div class="sidebar-title">Latest</div>
+      <!-- ~6 additional stories from the pool -->
+      {{LATEST_ITEMS}}
     </div>
-    <div class="sidebar-section">
-      <div class="sidebar-title">Trending Companies</div>
-      <!-- 5 trending companies related to the stories with real stock data -->
-      {{TRENDING_COMPANIES}}
-    </div>
-  </aside>
+  </div>
 
   <div class="colophon">
     Sources: {{ALL_SOURCES_WITH_LINKS}}<br>
     Editorially curated &middot; Built with Claude Code &middot; {{CURRENT_DATE}}
   </div>
+
 </div>
 
 </body>
 </html>
 ```
 
+### Ticker item format
+
+Each ticker item in the bar should follow this HTML structure:
+
+```html
+<div class="ticker-item">
+  <span class="ticker-label">S&P 500</span>
+  <span class="ticker-value">6,716.09</span>
+  <span class="ticker-change up">+0.25%</span>
+</div>
+```
+
+Use class `up` for positive changes (green), `down` for negative (red).
+
+### Latest item format
+
+Each latest sidebar item should follow this structure:
+
+```html
+<a class="latest-item" href="{{URL}}" target="_blank">
+  <div class="latest-time">{{RELATIVE_TIME}}</div>
+  <div class="latest-headline">{{HEADLINE}}</div>
+  <div class="latest-source">{{SOURCE}} · {{ENGAGEMENT}}</div>
+</a>
+```
+
+### Label class mapping
+
+| Label text | CSS class |
+|---|---|
+| BREAKING | `label-breaking` |
+| NEW RELEASE | `label-exclusive` |
+| ANALYSIS | `label-analysis` |
+| DEEP DIVE | `label-deepdive` |
+| EXCLUSIVE | `label-exclusive` |
+| POLICY | `label-policy` |
+| Event names (GTC 2026, etc.) | `label-exclusive` |
+
 ## Important Notes
 
 - **Always use the current date** when searching. Never hardcode dates.
 - **Parallel tool calls**: Run WebSearch calls in parallel. Run WebFetch calls in parallel. This dramatically speeds up the process.
 - **Editorial voice**: Rewrite summaries in your own voice. Never copy-paste article text verbatim. Have a point of view.
-- **Market data**: If you can't fetch a real stock price, omit that company rather than making up data. Never fabricate financial data.
-- **Sparkline SVGs**: Generate simple polyline paths. For positive change, trend upward (high Y values at start, low at end since SVG Y is inverted). For negative, trend downward.
+- **Market data**: If you can't fetch a real stock price, omit that ticker rather than making up data. Never fabricate financial data. Always show exact index values (e.g., `6,716.09`) not vague descriptions like "Flat".
+- **Dynamic tickers**: Extract tickers from the stories themselves. The ticker bar should feel contextually relevant to the briefing content, not generic.
+- **Google Finance first**: Always try Google Finance URLs first for market data. Fall back to stockanalysis.com or WebSearch only if Google Finance fails.
 - **Image fallbacks**: If an og:image URL returns a 404 or can't be found, try searching for an alternative article on the same story that has one.
 - **File location**: Always write to `~/Desktop/news-briefing.html` unless the user specifies otherwise.
 - **Nav brand**: Use "The AI Briefing" for tech/AI topics. For other topics, adapt the name (e.g., "The Crypto Briefing", "The Climate Briefing").
