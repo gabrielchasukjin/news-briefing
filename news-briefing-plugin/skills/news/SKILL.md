@@ -408,6 +408,44 @@ Each archive item should be:
 
 Scan the archive directory for all `.html` files (excluding `index.html`) to build the list. Sort by filename descending (newest first).
 
+### Phase 8: Email Delivery (optional)
+
+After the briefing is generated and archived, check if the Google Workspace CLI (`gws`) is available.
+
+#### Step 8A: Check for gws
+
+Run this **Bash** command:
+```bash
+which gws 2>/dev/null
+```
+
+If `gws` is not found, skip this phase entirely. Do not mention email delivery to the user.
+
+#### Step 8B: Check for saved email preference
+
+Read `~/.news-briefing/profile.json` and check if an `email` field exists. If it does, use that email address and skip to Step 8C.
+
+If no `email` field exists, ask the user:
+
+> "I can email this briefing to you. What email address should I send it to? (or say 'skip' to skip)"
+
+If the user provides an email, save it to `~/.news-briefing/profile.json` under the `email` field so they won't be asked again on future runs. If they say "skip" or "no", save `"email": "skip"` to suppress the prompt on future runs.
+
+If the saved value is `"skip"`, skip this phase silently.
+
+#### Step 8C: Send the email
+
+Run this **Bash** command:
+```bash
+gws gmail +send \
+  --to {email_address} \
+  --subject "Your Briefing — {topic} — {date}" \
+  --body "$(cat ~/Desktop/news-briefing.html)" \
+  --html
+```
+
+Tell the user the briefing was sent to their email.
+
 ---
 
 ## HTML Template
