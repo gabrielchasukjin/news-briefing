@@ -327,6 +327,87 @@ open ~/Desktop/news-briefing.html
 
 Then tell the user the briefing is ready and what stories were selected.
 
+### Phase 7: Archive and Index
+
+After writing the main briefing file, archive it and update the index page.
+
+#### Step 7A: Archive the briefing
+
+Run these **Bash** commands:
+```bash
+mkdir -p ~/Desktop/news-briefings
+```
+
+Then copy the briefing to the archive with a dated filename:
+```bash
+cp ~/Desktop/news-briefing.html ~/Desktop/news-briefings/YYYY-MM-DD-{topic}.html
+```
+
+Use the current date and a slugified version of the topic (e.g., `2026-03-17-langchain.html`, `2026-03-17-top-universities.html`). If no topic was provided, use `for-you` as the slug.
+
+#### Step 7B: Generate the archive index page
+
+Use **Bash** to list all `.html` files in `~/Desktop/news-briefings/` (excluding `index.html`), sorted by date descending. Then use the **Write** tool to generate `~/Desktop/news-briefings/index.html` — a dark-themed index page that lists all past briefings with:
+- The date
+- The topic (extracted from the filename slug)
+- A clickable link to open that briefing
+
+Use this template for the index page:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>News Briefing Archive</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800;900&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0a0a0a; --surface: #141414; --text: #ede9e3;
+      --text-sub: #a8a29e; --text-muted: #57534e; --border: #1f1f1f;
+      --accent: #d4a574; --sans: 'Inter', sans-serif; --serif: 'Playfair Display', Georgia, serif;
+    }
+    body { font-family: var(--sans); background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+    .container { max-width: 700px; margin: 0 auto; padding: 3rem 2rem; }
+    .brand { font-family: var(--serif); font-size: 1.5rem; font-weight: 800; margin-bottom: 0.5rem; }
+    .brand span { color: var(--accent); }
+    .subtitle { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2.5rem; }
+    .briefing-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1rem 0; border-bottom: 1px solid var(--border);
+      transition: opacity 0.15s;
+    }
+    .briefing-item:hover { opacity: 0.8; }
+    .briefing-date { font-size: 0.7rem; font-weight: 700; color: var(--accent); min-width: 100px; }
+    .briefing-topic { font-size: 0.9rem; font-weight: 600; flex: 1; text-transform: capitalize; }
+    .briefing-arrow { font-size: 0.75rem; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="brand">Briefing<span> Archive</span></div>
+  <div class="subtitle">All past news briefings, newest first.</div>
+  <!-- One .briefing-item per archived file -->
+  {{ARCHIVE_ITEMS}}
+</div>
+</body>
+</html>
+```
+
+Each archive item should be:
+```html
+<a class="briefing-item" href="./YYYY-MM-DD-topic.html">
+  <span class="briefing-date">Mar 17, 2026</span>
+  <span class="briefing-topic">Topic Name</span>
+  <span class="briefing-arrow">&rarr;</span>
+</a>
+```
+
+Scan the archive directory for all `.html` files (excluding `index.html`) to build the list. Sort by filename descending (newest first).
+
 ---
 
 ## HTML Template
