@@ -155,9 +155,81 @@ Add the discovered sources to the user's `~/.news-briefing/profile.json` under a
 
 On future runs, if `domain_sources` already exists in the cached profile, skip this phase and use the cached sources directly.
 
-### Phase 1: Source from High-Signal Feeds (Four Independent Sub-Agents)
+### Phase 0.6: Discover High-Signal Twitter/X Accounts
 
-Launch **four Agent sub-agents in parallel**. Each agent independently discovers and evaluates stories, then returns a ranked list. This architecture ensures:
+This phase dynamically discovers which Twitter/X accounts are worth monitoring for the user's interests. Like Phase 0.5, it runs ONCE and caches results.
+
+If `twitter_accounts` already exists in `~/.news-briefing/profile.json` and is non-empty, skip this phase entirely.
+
+#### Step 0.6A: Search for high-signal accounts
+
+For each HIGH-weight interest cluster from the user profile, run **WebSearch** queries in parallel:
+
+- `"most influential {domain} people on Twitter X to follow for news"`
+- `"best {domain} Twitter accounts for breaking news 2025 2026"`
+- `"who to follow on X for {domain} insights" site:reddit.com`
+
+Also run these cross-cutting queries:
+- `"AI researchers to follow on Twitter X" breaking news papers`
+- `"tech founders active on Twitter X" that share links`
+
+#### Step 0.6B: Extract from GitHub profiles
+
+Run this **Bash** command to get Twitter handles from the user's starred repos' authors:
+
+```bash
+gh api user/starred --per-page=30 --jq '.[].owner.login' | sort -u | head -20
+```
+
+Then for the top 10 most relevant owners (matching user interests), check their GitHub profiles for Twitter/X links:
+
+```bash
+gh api users/{username} --jq '{login, twitter_username, bio}'
+```
+
+This surfaces accounts that are both technically credible (they build things the user cares about) AND active on Twitter.
+
+#### Step 0.6C: Score and select accounts
+
+From all discovered accounts, select **15-25 accounts** using these criteria:
+
+1. **Appears in multiple search results** — community consensus that this person is high-signal
+2. **Has a GitHub profile with real projects** — not just a commentator, actually builds things
+3. **Known for sharing links/papers early** — not just hot takes, but surfaces original content
+4. **Domain match** — covers topics in the user's HIGH-weight interest tags
+
+Organize accounts into clusters matching the user's interest tags:
+
+```json
+{
+  "twitter_accounts": [
+    {
+      "handle": "kaboragimov",
+      "name": "Kabo Ragimov",
+      "domain": ["ai", "ml-research"],
+      "reason": "Curates AI research papers, often first to share arxiv papers",
+      "source": "web-search"
+    },
+    {
+      "handle": "jimfan",
+      "name": "Jim Fan",
+      "domain": ["robotics", "embodied-ai"],
+      "reason": "NVIDIA senior research scientist, shares robotics/embodied AI research",
+      "source": "web-search + github"
+    }
+  ]
+}
+```
+
+#### Step 0.6D: Cache the accounts
+
+Save the `twitter_accounts` array to `~/.news-briefing/profile.json`.
+
+On future runs, if this field exists and has entries, skip Phase 0.6 entirely and use the cached list. The list should be refreshed if the user's interest profile changes significantly (new HIGH-weight tags added).
+
+### Phase 1: Source from High-Signal Feeds (Six Independent Sub-Agents)
+
+Launch **six Agent sub-agents in parallel**. Each agent independently discovers and evaluates stories, then returns a ranked list. This architecture ensures:
 - Each agent explores different source types without overlap
 - No single failure mode kills the pipeline
 - Each agent applies its own quality filter before returning results
@@ -325,27 +397,116 @@ This agent reads the user's email newsletters via the `gws` CLI. These newslette
 
 6. **Return:** A JSON-formatted list of stories. Each entry: `{title, url, source, summary, newsletter, reading_time}`.
 
+#### Agent 5: Twitter/X Signal Scanner
+
+**Launch with:** `Agent` tool, subagent_type `general-purpose`
+
+This agent discovers what high-signal Twitter/X accounts are sharing — the links, papers, and takes that often precede coverage on HN or Techmeme by 12-24 hours.
+
+**Prompt the agent to:**
+
+1. **Read `~/.news-briefing/profile.json`** to get the `twitter_accounts` list. Extract all handles.
+
+2. **Search for recent tweets with links** using **WebSearch** queries in parallel. For each account cluster (grouped by domain), construct queries like:
+
+   ```
+   site:x.com "{handle}" filter:links {month} {year}
+   ```
+
+   Also run broader domain-level queries:
+   ```
+   site:x.com "{domain_keyword}" announcement OR paper OR launch {month} {year} -retweet
+   ```
+
+   Run **8-10 WebSearch queries in parallel**, covering the major account clusters.
+
+3. **Extract shared links.** From the search results, identify:
+   - URLs that high-signal accounts shared (the linked content, not the tweet itself)
+   - The account that shared it (for attribution)
+   - Any context from the tweet text (e.g., "This is huge — first open-weight model to beat GPT-5 on coding")
+   - Approximate time shared
+
+4. **De-duplicate and filter:**
+   - Drop self-promotional tweets (founders only sharing their own company's content)
+   - Drop tweets without external links (pure commentary/takes)
+   - Prefer tweets that share links to papers, blog posts, announcements, or tools
+   - If multiple accounts shared the same link, note ALL of them — this is a strong cross-account signal
+
+5. **For the top 5-8 shared links**, use **WebFetch** to read the linked article and extract:
+   - Title and 2-sentence summary
+   - The `og:image` URL if present
+   - Whether the content is genuinely new (not a rehash of something already widely covered)
+
+6. **Return:** A JSON-formatted list of 8-12 stories. Each entry: `{title, url, source, summary, shared_by (array of handles), tweet_context, og_image, shared_time}`.
+
+#### Agent 6: GitHub Trending Scanner
+
+**Launch with:** `Agent` tool, subagent_type `general-purpose`
+
+This agent surfaces new repositories that are gaining traction in the user's tech stack and interest areas — early signal on tools before they hit the news cycle.
+
+**Prompt the agent to:**
+
+1. **Read `~/.news-briefing/profile.json`** to get the user's `tech_stack` and `interests`.
+
+2. **Fetch GitHub trending pages** using **WebFetch** in parallel:
+   - `https://github.com/trending/python?since=daily` — Python daily trending
+   - `https://github.com/trending/typescript?since=daily` — TypeScript daily trending
+   - `https://github.com/trending?since=daily` — All languages daily trending
+   - `https://github.com/trending/python?since=weekly` — Python weekly (catches repos that trended earlier this week)
+
+3. **For each trending page**, extract:
+   - Repository full name (owner/repo)
+   - Description (one-line)
+   - Language
+   - Stars today / this week
+   - Total stars
+   - Whether the repo was created in the last 30 days (truly new vs. legacy repo having a moment)
+
+4. **Filter for relevance:**
+   - **Must match** at least one of: user's HIGH-weight interest tags OR tech_stack languages
+   - **Prefer** repos created in the last 30 days (genuinely new tools, not old repos resurfacing)
+   - **Prefer** repos with meaningful descriptions (not empty or one-word)
+   - **Drop** repos that are just homework/tutorials/awesome-lists unless they have 500+ stars today
+
+5. **For the top 5-8 repos**, use **WebFetch** on `https://github.com/{owner}/{repo}` to get:
+   - Full README first paragraph (what does this actually do?)
+   - Any linked demo, docs, or blog post URL
+   - The repo owner's profile (are they a known developer/company?)
+
+6. **Score repos:**
+   - **Stars today > 200** + matches HIGH-weight interest = top tier
+   - **Created < 7 days ago** + stars today > 50 = early signal, high value
+   - **Created < 30 days ago** + matches tech_stack = relevant new tool
+   - **Cross-signal bonus**: If the repo was ALSO shared by a Twitter account from Agent 5 or appeared on HN from Agent 1, it gets a massive boost
+
+7. **Return:** A JSON-formatted list of 5-8 repos, ranked by signal strength. Each entry: `{repo_name, url, description, language, stars_today, total_stars, created_date, is_new (boolean), relevance_reason, readme_summary}`.
+
 #### Step 1C: Merge and Score
 
-After all four agents return, merge their results into a single pool (typically 30-50 stories after de-duplication).
+After all six agents return, merge their results into a single pool (typically 40-70 stories after de-duplication).
 
 **Scoring algorithm (apply in order):**
 
-1. **Cross-agent signal (strongest):** A story found by 2+ agents scores highest. If Agent 1 found it on HN with 400+ pts AND Agent 4 found it in TLDR AI AND Agent 3 found it via search, that's near-guaranteed high quality.
+1. **Cross-agent signal (strongest):** A story found by 2+ agents scores highest. If Agent 1 found it on HN with 400+ pts AND Agent 5 found it shared by @karpathy AND Agent 4 found it in TLDR AI, that's near-guaranteed top-tier quality. GitHub trending repos that also appear on HN or were shared by Twitter accounts get the strongest possible signal.
 
 2. **Community engagement:** HN 300+ pts, Techmeme featured, or Lobsters 50+ pts. **Top 5 HN stories by points should always be considered for the final selection** — the user explicitly values HN trends.
 
-3. **Newsletter signal:** Stories that appear in TLDR AI or TLDR Data "HEADLINES & LAUNCHES" sections are pre-curated by expert editors and get a signal boost. Stories in both a TLDR newsletter AND HN/Techmeme are very high quality.
+3. **Twitter expert signal:** Stories shared by 2+ high-signal Twitter accounts get a significant boost — these accounts are curators, so multi-account sharing indicates expert consensus. Include the sharing accounts in the attribution (e.g., "Shared by @karpathy, @jimfan").
 
-4. **Original reporting bonus:** Stories flagged by Agent 3 as having original reporting (not press release rewrites) get a boost.
+4. **Newsletter signal:** Stories that appear in TLDR AI or TLDR Data "HEADLINES & LAUNCHES" sections are pre-curated by expert editors and get a signal boost. Stories in both a TLDR newsletter AND HN/Techmeme are very high quality.
 
-5. **Source reputation:** Known quality outlets (Ars Technica, TechCrunch, The Verge, NVIDIA Newsroom for NVIDIA topics, etc.) score higher than unknown blogs.
+5. **Original reporting bonus:** Stories flagged by Agent 3 as having original reporting (not press release rewrites) get a boost.
 
-6. **Recency:** Stories from the last 48 hours score higher than older ones.
+6. **GitHub trending signal:** Repos with 200+ stars today that match user interests are strong candidates for the sidebar. Repos with 500+ stars today or that cross-signal with HN/Twitter can compete for main story slots.
 
-7. **Interest match:** Stories matching the user's HIGH-weight interest tags get a relevance boost (only applies when no explicit topic is given).
+7. **Source reputation:** Known quality outlets (Ars Technica, TechCrunch, The Verge, NVIDIA Newsroom for NVIDIA topics, etc.) score higher than unknown blogs.
 
-**De-duplicate:** If multiple stories cover the same event, keep the one with the best source + highest engagement. Drop the rest.
+8. **Recency:** Stories from the last 48 hours score higher than older ones.
+
+9. **Interest match:** Stories matching the user's HIGH-weight interest tags get a relevance boost (only applies when no explicit topic is given).
+
+**De-duplicate:** If multiple stories cover the same event, keep the one with the best source + highest engagement. Drop the rest. When a Twitter account shared a link that also appeared on HN, merge them into a single entry with combined attribution.
 
 ### Phase 2: Editorial Curation
 
@@ -360,7 +521,9 @@ From the scored pool, select exactly **8 stories** for the main layout, plus **~
 5. **Surprise factor** — Prefer stories that are genuinely interesting or counterintuitive over predictable press releases.
 6. **Diversity** — Cover different facets (e.g., for tech: a deep technical post, a policy/business story, a tool/product, a cultural moment, an infrastructure play).
 
-**"Latest" sidebar stories** — pick 8 additional stories from the pool that didn't make the main 8 but are still interesting. These only need a headline, source, and approximate time. Include HN point counts or comment counts where available as social proof.
+**"Latest" sidebar stories** — pick 6-8 additional stories from the pool that didn't make the main 8 but are still interesting. These only need a headline, source, and approximate time. Include HN point counts or comment counts where available as social proof. Include Twitter attribution where available (e.g., "Shared by @karpathy").
+
+**"Trending Repos" sidebar section** — below the "Latest" section, add a "Trending Repos" section showing 3-5 GitHub repos from Agent 6 that are relevant to the user's interests. Each repo gets a compact card with: repo name, star count today, one-line description, and language badge. These are inherently lower-signal than curated news, so the sidebar is the right home — unless a repo crosses 500+ stars today AND cross-signals with a main story, in which case it can be promoted to the main 8.
 
 **What to avoid:**
 - Generic fundraising announcements (unless the amount or implications are genuinely significant)
@@ -380,6 +543,10 @@ Rank the main 8 stories 1-8 by significance. Story #1 gets hero treatment. Stori
 Do NOT use "BREAKING" unless something literally just happened in the last hour.
 
 **For source linking:** When a story originated from a community feed (HN, Lobsters), link to the **original source article**, not the discussion thread. But note the community engagement (e.g., "654 points on HN") in the editorial lede if it adds context.
+
+**Twitter attribution:** When a story was surfaced by Agent 5 (shared by Twitter accounts), include the sharing accounts in the meta line. Format: `"Shared by @karpathy, @jimfan · 418 pts on HN · Techmeme"`. This gives the user a sense of which experts noticed this story. If a story was ONLY found via Twitter (not on HN/Techmeme/TLDR), note the tweet context — e.g., a quote from the sharer that adds editorial value.
+
+**GitHub trending attribution:** When a GitHub repo appears in the sidebar, format the attribution as: `"★ {stars_today} today · {language} · Created {relative_date}"`. If the repo was also shared by a Twitter account or appeared on HN, note that cross-signal.
 
 ### Phase 3: Deep Content Fetch
 
@@ -981,6 +1148,71 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
       margin-top: 0.2rem;
     }
 
+    /* ── Trending Repos ── */
+    .trending-section {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+    .trending-title {
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.75rem;
+    }
+    .trending-repo {
+      display: block;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid var(--border);
+      transition: opacity 0.15s;
+    }
+    .trending-repo:last-child { border-bottom: none; }
+    .trending-repo:hover { opacity: 0.8; }
+    .trending-repo-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.25rem;
+    }
+    .trending-repo-stars {
+      font-size: 0.58rem;
+      font-weight: 700;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+    .trending-repo-name {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .trending-repo-desc {
+      font-size: 0.68rem;
+      color: var(--text-sub);
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .trending-repo-meta {
+      font-size: 0.55rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+    .lang-badge {
+      display: inline-block;
+      font-size: 0.5rem;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: var(--surface-2);
+      color: var(--text-sub);
+      letter-spacing: 0.02em;
+    }
+
     /* ── Colophon ── */
     .colophon {
       padding: 2rem 0 2.5rem;
@@ -1320,13 +1552,19 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
     <!-- Latest sidebar -->
     <div class="lower-sidebar">
       <div class="sidebar-title">Latest</div>
-      <!-- ~8 additional stories from the pool -->
+      <!-- ~6-8 additional stories from the pool -->
       {{LATEST_ITEMS}}
+
+      <!-- Trending repos from GitHub -->
+      <div class="trending-section">
+        <div class="trending-title">Trending Repos</div>
+        {{TRENDING_REPO_ITEMS}}
+      </div>
     </div>
   </div>
 
   <div class="colophon">
-    Sources: {{ALL_SOURCES_WITH_LINKS}}<br>
+    Sources: {{ALL_SOURCES_WITH_LINKS}} &middot; <a href="https://x.com" target="_blank">X/Twitter</a> &middot; <a href="https://github.com/trending" target="_blank">GitHub Trending</a><br>
     Editorially curated &middot; Built with Claude Code &middot; {{CURRENT_DATE}}
   </div>
 
@@ -1349,6 +1587,12 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
   <div class="reader-timeline">
     <!-- Sidebar 8 stories: use class="reader-story" (no featured class) -->
     {{READER_SIDEBAR_STORIES}}
+  </div>
+
+  <div class="reader-section">Trending Repos</div>
+  <div class="reader-timeline">
+    <!-- 3-5 GitHub trending repos relevant to user interests -->
+    {{READER_TRENDING_REPOS}}
   </div>
 
   <div class="reader-colophon">
@@ -1472,6 +1716,24 @@ The reader view shows ALL 16 stories split into two sections with a vertical tim
 
 The `{{READER_TOP_STORIES}}` placeholder contains stories #1-8 (2-3 boxed + rest featured). The `{{READER_SIDEBAR_STORIES}}` placeholder contains stories #9-16 (unfeatured). Both sit inside their own `.reader-timeline` wrapper which draws the vertical spine.
 
+### Trending repo item format
+
+Each trending repo in the sidebar should follow this structure:
+
+```html
+<a class="trending-repo" href="https://github.com/{{OWNER}}/{{REPO}}" target="_blank">
+  <div class="trending-repo-header">
+    <span class="trending-repo-stars">★ {{STARS_TODAY}} today</span>
+    <span class="lang-badge">{{LANGUAGE}}</span>
+  </div>
+  <div class="trending-repo-name">{{OWNER}}/{{REPO}}</div>
+  <div class="trending-repo-desc">{{DESCRIPTION}}</div>
+  <div class="trending-repo-meta">{{TOTAL_STARS}} total · Created {{RELATIVE_DATE}}{{CROSS_SIGNAL}}</div>
+</a>
+```
+
+Where `{{CROSS_SIGNAL}}` is optionally ` · Also on HN` or ` · Shared by @handle` if the repo was found by another agent too.
+
 ### Label class mapping
 
 | Label text | CSS class |
@@ -1495,3 +1757,7 @@ The `{{READER_TOP_STORIES}}` placeholder contains stories #1-8 (2-3 boxed + rest
 - **Image fallbacks**: If an og:image URL returns a 404 or can't be found, try searching for an alternative article on the same story that has one.
 - **File location**: Always write to `~/Desktop/news-briefing.html` unless the user specifies otherwise.
 - **Nav brand**: Use "The AI Briefing" for tech/AI topics. For other topics, adapt the name (e.g., "The Crypto Briefing", "The Climate Briefing").
+- **Twitter/X sourcing**: Agent 5 uses WebSearch with `site:x.com` queries — this is the most reliable method since Google indexes popular tweets quickly. Do NOT try to use the Twitter API or scrape X directly. If WebSearch returns no useful tweets for an account, skip that account gracefully.
+- **GitHub trending**: Agent 6 fetches GitHub trending pages which are public and reliably fetchable. Filter aggressively — most trending repos are not newsworthy. Only surface repos that match user interests AND show strong signals (high stars today, genuinely new, or cross-signal with other agents).
+- **Twitter account discovery**: Phase 0.6 runs once and caches accounts in profile.json. The discovery combines web search (what the community recommends following), GitHub profiles (Twitter handles of repo authors the user has starred), and domain expertise. This avoids hardcoding accounts and keeps the list personalized to the user's actual interests.
+- **Source attribution with Twitter**: When a story was shared by high-signal Twitter accounts, always include their handles in the meta line. This gives users a social proof signal ("@karpathy shared this") and helps them discover accounts worth following.
