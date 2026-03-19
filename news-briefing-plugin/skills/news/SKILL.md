@@ -291,9 +291,9 @@ After all three agents return, merge their results into a single pool (typically
 
 ### Phase 2: Editorial Curation
 
-From the scored pool, select exactly **5 stories** for the main layout, plus **~6 additional stories** for the "Latest" sidebar feed.
+From the scored pool, select exactly **8 stories** for the main layout, plus **~8 additional stories** for the "Latest" sidebar feed.
 
-**Main 5 stories** — use these criteria (in priority order):
+**Main 8 stories** — use these criteria (in priority order):
 
 1. **Cross-source signal** — Stories that appear across multiple high-signal feeds (HN + Techmeme, HN + TLDR, etc.) get priority. This is the strongest quality signal.
 2. **Community engagement** — High point counts, comment counts, and upvotes indicate the story resonated with a technical audience.
@@ -302,7 +302,7 @@ From the scored pool, select exactly **5 stories** for the main layout, plus **~
 5. **Surprise factor** — Prefer stories that are genuinely interesting or counterintuitive over predictable press releases.
 6. **Diversity** — Cover different facets (e.g., for tech: a deep technical post, a policy/business story, a tool/product, a cultural moment, an infrastructure play).
 
-**"Latest" sidebar stories** — pick 6 additional stories from the pool that didn't make the main 5 but are still interesting. These only need a headline, source, and approximate time. Include HN point counts or comment counts where available as social proof.
+**"Latest" sidebar stories** — pick 8 additional stories from the pool that didn't make the main 8 but are still interesting. These only need a headline, source, and approximate time. Include HN point counts or comment counts where available as social proof.
 
 **What to avoid:**
 - Generic fundraising announcements (unless the amount or implications are genuinely significant)
@@ -310,7 +310,7 @@ From the scored pool, select exactly **5 stories** for the main layout, plus **~
 - SEO-driven blog posts with no original reporting
 - Stories that are just repackaging a press release
 
-Rank the main 5 stories 1-5 by significance. Story #1 gets hero treatment. Stories #2-3 go in the hero sidebar. Stories #4-5 get the lower feature treatment.
+Rank the main 8 stories 1-8 by significance. Story #1 gets hero treatment. Stories #2-3 go in the hero sidebar. Stories #4-6 go in the mid-grid (3-column card layout with images). Stories #7-8 get the lower feature treatment alongside the "Latest" sidebar.
 
 **Editorial labels** — assign each main story a label that tells readers what kind of content it is:
 - `NEW RELEASE` — product or model launches
@@ -325,7 +325,7 @@ Do NOT use "BREAKING" unless something literally just happened in the last hour.
 
 ### Phase 3: Deep Content Fetch
 
-For each of the 5 main stories, use **WebFetch** in parallel to:
+For each of the 8 main stories, use **WebFetch** in parallel to:
 
 1. Fetch the article page and extract:
    - The `og:image` meta tag URL (for the real article image)
@@ -388,7 +388,7 @@ Use the template structure below. Replace ALL placeholder content with real data
 - Every `<img src>` must use the real og:image URL from Phase 3
 - Every stock price, percentage, and index value must be real data from Phase 4
 - Write editorial-quality summaries — not copy-pasted article text. Rewrite in your own voice with a point of view.
-- Story #1 gets a full lede paragraph in the hero. Stories #2-3 get headline + short lede in the hero sidebar. Stories #4-5 get the lower feature treatment with images + ledes.
+- Story #1 gets a full lede paragraph in the hero. Stories #2-3 get headline + short lede in the hero sidebar. Stories #4-6 get the mid-grid card treatment (image + headline + short lede). Stories #7-8 get the lower feature treatment with images + ledes.
 
 **Nav:**
 - Only show a single **"For You"** tab (active). Do NOT generate additional tabs. Keep the nav clean and minimal.
@@ -762,6 +762,52 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
       color: var(--text-muted);
     }
 
+    /* ── Mid Grid (3 card columns) ── */
+    .mid-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+      padding: 2rem 0;
+      border-bottom: 1px solid var(--border-light);
+    }
+    .mid-card {
+      display: block;
+      transition: opacity 0.15s;
+    }
+    .mid-card:hover { opacity: 0.85; }
+    .mid-card .card-img {
+      width: 100%;
+      aspect-ratio: 16/10;
+      object-fit: cover;
+      border-radius: 5px;
+      margin-bottom: 0.75rem;
+    }
+    .mid-card h3 {
+      font-family: var(--serif);
+      font-size: 1.05rem;
+      font-weight: 700;
+      line-height: 1.3;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+      transition: color 0.2s;
+    }
+    .mid-card:hover h3 { color: var(--accent); }
+    .mid-card .card-lede {
+      font-family: var(--body-serif);
+      font-size: 0.8rem;
+      color: var(--text-sub);
+      line-height: 1.6;
+      margin-bottom: 0.4rem;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .mid-card .meta {
+      font-size: 0.58rem;
+      color: var(--text-muted);
+    }
+
     /* ── Lower Grid (3 col: feature + story + latest sidebar) ── */
     .lower-section {
       display: grid;
@@ -892,6 +938,7 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
       .hero-zone { grid-template-columns: 1fr; }
       .hero-main { padding-right: 0; border-right: none; border-bottom: 1px solid var(--border-light); padding-bottom: 1.5rem; }
       .hero-sidebar { padding-left: 0; padding-top: 1.5rem; }
+      .mid-grid { grid-template-columns: 1fr; gap: 1.5rem; }
       .lower-section { grid-template-columns: 1fr; }
       .lower-feature { padding-right: 0; border-right: none; border-bottom: 1px solid var(--border-light); padding-bottom: 1.5rem; }
       .lower-mid { padding: 1.5rem 0; border-right: none; border-bottom: 1px solid var(--border-light); }
@@ -964,38 +1011,66 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
     </div>
   </div>
 
+  <!-- ── Mid Grid (3 cards) ── -->
+  <div class="mid-grid">
+    <!-- Story #4 -->
+    <a class="mid-card" href="{{STORY_4_URL}}" target="_blank">
+      <img class="card-img" src="{{STORY_4_IMAGE}}" alt="{{STORY_4_ALT}}">
+      <div class="label {{STORY_4_LABEL_CLASS}}">{{STORY_4_LABEL}}</div>
+      <h3>{{STORY_4_HEADLINE}}</h3>
+      <p class="card-lede">{{STORY_4_SHORT_LEDE}}</p>
+      <div class="meta">{{STORY_4_SOURCES}}</div>
+    </a>
+    <!-- Story #5 -->
+    <a class="mid-card" href="{{STORY_5_URL}}" target="_blank">
+      <img class="card-img" src="{{STORY_5_IMAGE}}" alt="{{STORY_5_ALT}}">
+      <div class="label {{STORY_5_LABEL_CLASS}}">{{STORY_5_LABEL}}</div>
+      <h3>{{STORY_5_HEADLINE}}</h3>
+      <p class="card-lede">{{STORY_5_SHORT_LEDE}}</p>
+      <div class="meta">{{STORY_5_SOURCES}}</div>
+    </a>
+    <!-- Story #6 -->
+    <a class="mid-card" href="{{STORY_6_URL}}" target="_blank">
+      <img class="card-img" src="{{STORY_6_IMAGE}}" alt="{{STORY_6_ALT}}">
+      <div class="label {{STORY_6_LABEL_CLASS}}">{{STORY_6_LABEL}}</div>
+      <h3>{{STORY_6_HEADLINE}}</h3>
+      <p class="card-lede">{{STORY_6_SHORT_LEDE}}</p>
+      <div class="meta">{{STORY_6_SOURCES}}</div>
+    </a>
+  </div>
+
   <!-- ── Lower Section ── -->
   <div class="lower-section">
-    <!-- Story #4 -->
+    <!-- Story #7 -->
     <div class="lower-feature">
-      <div class="label {{STORY_4_LABEL_CLASS}}">{{STORY_4_LABEL}}</div>
-      <a href="{{STORY_4_URL}}" target="_blank">
-        <img class="feature-img" src="{{STORY_4_IMAGE}}" alt="{{STORY_4_ALT}}">
+      <div class="label {{STORY_7_LABEL_CLASS}}">{{STORY_7_LABEL}}</div>
+      <a href="{{STORY_7_URL}}" target="_blank">
+        <img class="feature-img" src="{{STORY_7_IMAGE}}" alt="{{STORY_7_ALT}}">
       </a>
-      <a href="{{STORY_4_URL}}" target="_blank">
-        <h2>{{STORY_4_HEADLINE}}</h2>
+      <a href="{{STORY_7_URL}}" target="_blank">
+        <h2>{{STORY_7_HEADLINE}}</h2>
       </a>
-      <p class="lede">{{STORY_4_LEDE}}</p>
-      <div class="meta">{{STORY_4_SOURCES}}</div>
+      <p class="lede">{{STORY_7_LEDE}}</p>
+      <div class="meta">{{STORY_7_SOURCES}}</div>
     </div>
 
-    <!-- Story #5 -->
+    <!-- Story #8 -->
     <div class="lower-mid">
-      <div class="label {{STORY_5_LABEL_CLASS}}">{{STORY_5_LABEL}}</div>
-      <a href="{{STORY_5_URL}}" target="_blank">
-        <img class="mid-img" src="{{STORY_5_IMAGE}}" alt="{{STORY_5_ALT}}">
+      <div class="label {{STORY_8_LABEL_CLASS}}">{{STORY_8_LABEL}}</div>
+      <a href="{{STORY_8_URL}}" target="_blank">
+        <img class="mid-img" src="{{STORY_8_IMAGE}}" alt="{{STORY_8_ALT}}">
       </a>
-      <a href="{{STORY_5_URL}}" target="_blank">
-        <h2>{{STORY_5_HEADLINE}}</h2>
+      <a href="{{STORY_8_URL}}" target="_blank">
+        <h2>{{STORY_8_HEADLINE}}</h2>
       </a>
-      <p class="lede">{{STORY_5_LEDE}}</p>
-      <div class="meta">{{STORY_5_SOURCES}}</div>
+      <p class="lede">{{STORY_8_LEDE}}</p>
+      <div class="meta">{{STORY_8_SOURCES}}</div>
     </div>
 
     <!-- Latest sidebar -->
     <div class="lower-sidebar">
       <div class="sidebar-title">Latest</div>
-      <!-- ~6 additional stories from the pool -->
+      <!-- ~8 additional stories from the pool -->
       {{LATEST_ITEMS}}
     </div>
   </div>
