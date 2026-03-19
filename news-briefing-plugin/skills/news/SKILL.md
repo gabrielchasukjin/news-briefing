@@ -545,7 +545,7 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{BRIEFING_TITLE}}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,700;0,800;0,900;1,400&family=Source+Serif+4:ital,wght@0,400;0,500;1,400&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,700;0,800;0,900;1,400&family=Source+Serif+4:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -951,6 +951,141 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
       .hero-main h1 { font-size: 1.8rem; }
       .nav-date { display: none; }
     }
+
+    /* ── View Toggle Button ── */
+    .view-toggle {
+      font-family: var(--sans);
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      padding: 5px 12px;
+      border-radius: 4px;
+      border: 1px solid var(--border-light);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .view-toggle:hover { color: var(--text); border-color: var(--text-muted); }
+
+    /* ── Reader View (PI-inspired) ── */
+    .reader-view { display: none; }
+    body.reader-mode .bloomberg-view { display: none; }
+    body.reader-mode .reader-view { display: block; }
+    body.reader-mode .ticker-bar { display: none; }
+
+    body.reader-mode {
+      --bg: #f0ebe4;
+      --surface: #e8e2da;
+      --text: #1a1a1a;
+      --text-sub: #4a4540;
+      --text-muted: #8a8480;
+      --border: #d4cec6;
+      --border-light: #c8c2ba;
+      --accent: #1a1a1a;
+      --mono: 'IBM Plex Mono', 'Menlo', monospace;
+      background: var(--bg);
+      color: var(--text);
+    }
+    body.reader-mode .nav {
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+    body.reader-mode .nav-brand { color: var(--text); }
+    body.reader-mode .nav-brand span { color: var(--text); }
+    body.reader-mode .nav-tab { color: var(--text); border-bottom-color: var(--text); }
+    body.reader-mode .nav-date { color: var(--text-muted); }
+    body.reader-mode .view-toggle { color: var(--text-muted); border-color: var(--border); }
+    body.reader-mode .view-toggle:hover { color: var(--text); border-color: var(--text-muted); }
+
+    .reader-view {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 2.5rem 2rem 4rem;
+    }
+    .reader-header {
+      margin-bottom: 2.5rem;
+    }
+    .reader-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 2.2rem;
+      font-weight: 400;
+      line-height: 1.2;
+      color: var(--text);
+      margin-bottom: 1rem;
+      letter-spacing: -0.01em;
+    }
+    .reader-subtitle {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: var(--text-sub);
+      line-height: 1.7;
+    }
+    .reader-story {
+      display: flex;
+      gap: 1rem;
+      padding: 1.25rem 0;
+      text-decoration: none;
+      color: inherit;
+      transition: opacity 0.15s;
+    }
+    .reader-story:hover { opacity: 0.75; }
+    .reader-bullet {
+      width: 10px;
+      height: 10px;
+      min-width: 10px;
+      background: var(--text);
+      border-radius: 50%;
+      margin-top: 0.5rem;
+    }
+    .reader-story-content {
+      flex: 1;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      padding: 1rem 1.25rem;
+      transition: border-color 0.2s;
+    }
+    .reader-story:nth-child(odd) .reader-story-content {
+      border-color: var(--border);
+      background: rgba(255,255,255,0.3);
+    }
+    .reader-story-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    .reader-story-title {
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.4;
+    }
+    .reader-story-date {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .reader-story-lede {
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--text-sub);
+      line-height: 1.65;
+    }
+    .reader-colophon {
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-align: center;
+      line-height: 1.8;
+    }
+    .reader-colophon a { color: var(--text-sub); text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -972,11 +1107,12 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
     <div class="nav-right">
       <span class="nav-tab">For You</span>
       <span class="nav-date">{{FULL_DATE}}</span>
+      <button class="view-toggle" onclick="toggleView()">Reader View</button>
     </div>
   </div>
 </div>
 
-<div class="layout">
+<div class="layout bloomberg-view">
 
   <!-- ── Hero Zone ── -->
   <div class="hero-zone">
@@ -1082,6 +1218,28 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
 
 </div>
 
+<!-- ── Reader View (PI-style) ── -->
+<div class="reader-view">
+  <div class="reader-header">
+    <div class="reader-title">{{BRIEFING_TITLE}}</div>
+    <div class="reader-subtitle">{{READER_SUBTITLE}}</div>
+  </div>
+  {{READER_STORIES}}
+  <div class="reader-colophon">
+    Sources: {{ALL_SOURCES_WITH_LINKS}}<br>
+    Editorially curated &middot; Built with Claude Code &middot; {{CURRENT_DATE}}
+  </div>
+</div>
+
+<script>
+function toggleView() {
+  const body = document.body;
+  const btn = document.querySelector('.view-toggle');
+  body.classList.toggle('reader-mode');
+  btn.textContent = body.classList.contains('reader-mode') ? 'Editorial View' : 'Reader View';
+}
+</script>
+
 </body>
 </html>
 ```
@@ -1111,6 +1269,27 @@ Each latest sidebar item should follow this structure:
   <div class="latest-source">{{SOURCE}} · {{ENGAGEMENT}}</div>
 </a>
 ```
+
+### Reader view story format
+
+The reader view shows ALL stories (main 8 + sidebar 8 = 16 total) as a flat, chronological timeline. Each story uses this structure:
+
+```html
+<a class="reader-story" href="{{URL}}" target="_blank">
+  <div class="reader-bullet"></div>
+  <div class="reader-story-content">
+    <div class="reader-story-header">
+      <span class="reader-story-title">{{HEADLINE}}</span>
+      <span class="reader-story-date">{{DATE}}</span>
+    </div>
+    <div class="reader-story-lede">{{SHORT_SUMMARY}}</div>
+  </div>
+</a>
+```
+
+The `{{READER_SUBTITLE}}` placeholder should be a 2-3 sentence monospace-friendly description of the briefing's theme (e.g., "Curated from Hacker News, Techmeme, ArXiv, and domain feeds. Covering robotics, AI agents, crypto, and developer tools.").
+
+The `{{READER_STORIES}}` placeholder should contain one `reader-story` block for each of the 16 stories, ordered by significance (main 8 first, then sidebar 8). Odd-numbered stories get the bordered card treatment automatically via CSS.
 
 ### Label class mapping
 
