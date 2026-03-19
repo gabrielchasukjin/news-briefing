@@ -155,53 +155,139 @@ Add the discovered sources to the user's `~/.news-briefing/profile.json` under a
 
 On future runs, if `domain_sources` already exists in the cached profile, skip this phase and use the cached sources directly.
 
-### Phase 1: Source from High-Signal Feeds
+### Phase 1: Source from High-Signal Feeds (Three Independent Sub-Agents)
 
-Fetch from TWO categories of sources in parallel: **universal feeds** (tech community at large) and **domain-specific feeds** (from Phase 0.5).
+Launch **three Agent sub-agents in parallel**. Each agent independently discovers and evaluates stories, then returns a ranked list. This architecture ensures:
+- Each agent explores different source types without overlap
+- No single failure mode kills the pipeline
+- Each agent applies its own quality filter before returning results
 
-#### Step 1A: Fetch universal feeds (run ALL in parallel)
+All three agents receive the **topic** (if provided) and the **user interest profile** for context.
 
-These are always fetched regardless of topic or user profile:
+#### Agent 1: Community Signal Scanner
 
-- `https://news.ycombinator.com/front` — Hacker News front page. Extract story titles, source domains, point counts, comment counts. Stories with 300+ points are high-signal.
-- `https://techmeme.com/` — Techmeme river. Algorithmically curated tech news. Extract headlines and source outlets.
+**Launch with:** `Agent` tool, subagent_type `general-purpose`
 
-#### Step 1A.5: Fetch domain-specific feeds (run ALL in parallel with Step 1A)
+**Prompt the agent to:**
 
-Fetch the front pages of ALL sources from Phase 0.5's `domain_sources` list. For each, extract story titles, URLs, and any engagement signals.
+1. Fetch these community-curated feeds using **WebFetch** (all in parallel):
+   - `https://news.ycombinator.com/front` — Extract story titles, URLs, source domains, point counts, comment counts
+   - `https://techmeme.com/` — Extract headlines, source outlets, clustering signals
+   - `https://lobste.rs/` — Extract titles, URLs, tags, comment counts
 
-Additionally, based on the user's interest profile, fetch relevant specialty feeds:
+2. **Filter for relevance:** If a topic was provided, only keep stories directly related to the topic. If no topic, keep all stories above 100 points (HN) or featured (Techmeme).
 
-**For AI/ML interests:**
-- `https://tldr.tech/ai` — TLDR AI newsletter
-- `https://arxiv.org/list/cs.AI/recent` — Recent ArXiv AI papers
+3. **Quality signals to extract per story:**
+   - Title and original source URL (NOT the discussion thread URL)
+   - Point count / comment count / upvote count
+   - Source domain reputation (e.g., arxiv.org > random blog)
+   - Which feeds it appeared on (cross-source = higher signal)
 
-**For crypto interests:**
-- `https://tldr.tech/crypto` — TLDR Crypto
-- `https://www.theblock.co/latest` — The Block
+4. **Return:** A JSON-formatted list of 10-15 stories, ranked by engagement. Each entry: `{title, url, source, points, comments, feeds_appeared_on}`.
 
-**For general tech interests:**
-- `https://tldr.tech/` — TLDR Tech
-- `https://lobste.rs/` — Lobsters
+#### Agent 2: Domain Feed Scanner
 
-**For startup/product interests:**
-- `https://www.producthunt.com/` — Product Hunt
+**Launch with:** `Agent` tool, subagent_type `general-purpose`
 
-For each feed, extract story titles, URLs, and any engagement signals (points, comments, upvotes).
+**Prompt the agent to:**
 
-#### Step 1B: Cross-reference with web search (run in parallel with 1A)
+1. Read `~/.news-briefing/profile.json` to get the `domain_sources` list.
 
-Run 2 **WebSearch** queries to catch anything the feeds might miss:
-- `"most important {topic} news {current month} {current year}"`
-- `"{topic} breaking news today {current date}"`
+2. Fetch the front page of **every source** in `domain_sources` using **WebFetch** (all in parallel). Also fetch interest-matched specialty feeds:
 
-If no topic was provided, default to tech and AI.
+   **For AI/ML interests:**
+   - `https://arxiv.org/list/cs.AI/recent` — Recent ArXiv AI papers
 
-#### Step 1C: Merge and score
+   **For crypto interests:**
+   - `https://www.theblock.co/latest` — The Block
 
-Combine all results from 1A and 1B into a single pool. You should have 30-50 raw stories.
+   **For robotics interests:**
+   - `https://spectrum.ieee.org/topic/robotics/` — IEEE Spectrum Robotics
 
-**Score each story higher if it appears in multiple sources.** A story on both HN (300+ pts) and Techmeme is much higher signal than one that only appeared in a generic Google search result.
+   **For startup/product interests:**
+   - `https://www.producthunt.com/` — Product Hunt
+
+3. For each feed, extract story titles, URLs, dates, and any engagement signals.
+
+4. **Filter for relevance:** If a topic was provided, only keep stories directly related. If no topic, keep the most interesting/recent 10-15 stories that match the user's HIGH-weight interest tags.
+
+5. **Return:** A JSON-formatted list of 10-15 stories. Each entry: `{title, url, source_name, date, relevance_to_topic}`.
+
+#### Agent 3: Deep Search Researcher
+
+**Launch with:** `Agent` tool, subagent_type `general-purpose`
+
+This agent does NOT use generic queries. It crafts **precise, editorial-quality search queries** designed to surface original reporting and expert analysis while filtering out SEO noise, listicles, and press release rewrites.
+
+**Prompt the agent to:**
+
+1. **Construct 5-6 targeted WebSearch queries** using these principles:
+
+   **Query design rules:**
+   - Use exact-phrase quotes around the core topic (e.g., `"Nemotron 3"` not `Nemotron 3`)
+   - Append specific angles to each query — never search the same angle twice
+   - Target known high-quality publications with `site:` when useful
+   - Include the current month and year for recency, but NEVER use filler like "most important" or "breaking news" — these attract SEO spam
+   - Use Boolean operators: `OR` to widen, `-` to exclude noise (e.g., `-listicle -"top 10"`)
+
+   **Query templates (adapt to the actual topic):**
+
+   ```
+   Query 1 — Recent events/announcements:
+   "{topic}" announcement OR launch OR release {month} {year}
+
+   Query 2 — Expert analysis from quality outlets:
+   "{topic}" site:arstechnica.com OR site:theverge.com OR site:wired.com OR site:techcrunch.com
+
+   Query 3 — Technical deep dives:
+   "{topic}" benchmark OR architecture OR "how it works" OR technical
+
+   Query 4 — Industry/competitive implications:
+   "{topic}" vs OR competition OR implications OR "what this means" {year}
+
+   Query 5 — Original reporting (exclude aggregators):
+   "{topic}" -"round up" -listicle -"top 10" exclusive OR report OR investigation {month} {year}
+
+   Query 6 — Community/expert discussion:
+   "{topic}" site:reddit.com OR site:twitter.com expert OR engineer OR researcher {year}
+   ```
+
+   **If no topic provided**, use the user's HIGH-weight interest tags to generate 2 queries per interest cluster.
+
+2. Run all WebSearch queries **in parallel**.
+
+3. **De-duplicate and quality-filter** the results:
+   - Drop results from known low-signal domains (medium.com listicles, SEO farms, content mills)
+   - Drop results that are obviously press release rewrites (check if multiple results have near-identical titles)
+   - Prefer results from publications known for original reporting
+   - Prefer results with specific facts, numbers, or quotes over vague summaries
+
+4. **For the top 5 results**, use **WebFetch** to read the actual article and extract:
+   - A 2-3 sentence summary of the key facts
+   - Whether it contains original reporting vs. just repackaging
+   - The `og:image` URL if present
+
+5. **Return:** A JSON-formatted list of 8-12 stories, ranked by quality of reporting. Each entry: `{title, url, source, summary, has_original_reporting, og_image}`.
+
+#### Step 1C: Merge and Score
+
+After all three agents return, merge their results into a single pool (typically 25-40 stories after de-duplication).
+
+**Scoring algorithm (apply in order):**
+
+1. **Cross-agent signal (strongest):** A story found by 2+ agents scores highest. If Agent 1 found it on HN with 400+ pts AND Agent 3 found it via search, that's near-guaranteed high quality.
+
+2. **Community engagement:** HN 300+ pts, Techmeme featured, or Lobsters 50+ pts.
+
+3. **Original reporting bonus:** Stories flagged by Agent 3 as having original reporting (not press release rewrites) get a boost.
+
+4. **Source reputation:** Known quality outlets (Ars Technica, TechCrunch, The Verge, NVIDIA Newsroom for NVIDIA topics, etc.) score higher than unknown blogs.
+
+5. **Recency:** Stories from the last 48 hours score higher than older ones.
+
+6. **Interest match:** Stories matching the user's HIGH-weight interest tags get a relevance boost (only applies when no explicit topic is given).
+
+**De-duplicate:** If multiple stories cover the same event, keep the one with the best source + highest engagement. Drop the rest.
 
 ### Phase 2: Editorial Curation
 
@@ -267,25 +353,24 @@ Collect up to **8 tickers** from the stories. If fewer than 4 are found, pad wit
 
 #### Step 4B: Fetch exact index values
 
-Use **WebFetch** in parallel on Google Finance pages to get **exact, current index values**:
+**Use stockanalysis.com as the primary source** — Google Finance pages render via JavaScript and fail with WebFetch.
 
-- `https://www.google.com/finance/quote/.INX:INDEXSP` — S&P 500 (extract exact value like `6,716.09` and day change)
-- `https://www.google.com/finance/quote/.IXIC:INDEXNASDAQ` — NASDAQ Composite (extract exact value and day change)
+Use **WebFetch** in parallel:
+- `https://stockanalysis.com/stocks/spy/` — S&P 500 (SPY ETF as proxy, extract price and day change)
 
-Also fetch **WebFetch** on these for Bitcoin and other relevant indicators:
-- `https://www.google.com/finance/quote/BTC-USD` — Bitcoin price
-
-If Google Finance pages fail or don't return data, fall back to **WebSearch** for `"S&P 500 price today"` etc.
+For indices and Bitcoin, use **WebSearch** in parallel:
+- `"S&P 500 index price today {current date}"` — Extract exact value and percentage change
+- `"NASDAQ composite price today {current date}"` — Extract exact value and percentage change
+- `"Bitcoin BTC price today {current date}"` — Extract exact price and percentage change
 
 #### Step 4C: Fetch individual stock prices
 
 For each ticker from Step 4A, use **WebFetch** in parallel on:
-- `https://www.google.com/finance/quote/{TICKER}:NASDAQ` or
-- `https://www.google.com/finance/quote/{TICKER}:NYSE`
+- `https://stockanalysis.com/stocks/{TICKER}/`
 
 Extract: current price, day change amount, day change percentage.
 
-If Google Finance fails for a ticker, fall back to `https://stockanalysis.com/stocks/{TICKER}/`.
+If stockanalysis.com fails for a ticker, fall back to **WebSearch** for `"{TICKER} stock price today"`.
 
 **Critical rules:**
 - Never fabricate financial data. If you can't fetch a real price, omit that ticker.
@@ -971,7 +1056,7 @@ Each latest sidebar item should follow this structure:
 - **Editorial voice**: Rewrite summaries in your own voice. Never copy-paste article text verbatim. Have a point of view.
 - **Market data**: If you can't fetch a real stock price, omit that ticker rather than making up data. Never fabricate financial data. Always show exact index values (e.g., `6,716.09`) not vague descriptions like "Flat".
 - **Dynamic tickers**: Extract tickers from the stories themselves. The ticker bar should feel contextually relevant to the briefing content, not generic.
-- **Google Finance first**: Always try Google Finance URLs first for market data. Fall back to stockanalysis.com or WebSearch only if Google Finance fails.
+- **stockanalysis.com first**: Always use stockanalysis.com for individual stock prices — Google Finance renders via JavaScript and fails with WebFetch. Use WebSearch for index values (S&P 500, NASDAQ) and Bitcoin.
 - **Image fallbacks**: If an og:image URL returns a 404 or can't be found, try searching for an alternative article on the same story that has one.
 - **File location**: Always write to `~/Desktop/news-briefing.html` unless the user specifies otherwise.
 - **Nav brand**: Use "The AI Briefing" for tech/AI topics. For other topics, adapt the name (e.g., "The Crypto Briefing", "The Climate Briefing").
