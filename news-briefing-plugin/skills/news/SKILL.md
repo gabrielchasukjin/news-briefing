@@ -1066,53 +1066,33 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
       z-index: 1;
     }
 
-    /* Featured stories get bordered card + accent bar */
-    .reader-story.featured .reader-story-content {
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--text);
-      background: rgba(255,255,255,0.3);
-      border-radius: 4px;
-      padding: 1rem 1.25rem;
-    }
-    .reader-story.featured:hover {
-      transform: translateX(3px);
-    }
-    .reader-story.featured::before {
-      background: var(--text);
-      width: 10px; height: 10px;
-    }
-
-    /* Lead story (first story) gets extra treatment */
-    .reader-story.lead .reader-story-title {
-      font-size: 1.05rem;
-      font-weight: 700;
-    }
-    .reader-story.lead .reader-story-content {
-      border: 1px solid var(--border);
-      border-left: 4px solid var(--text);
-      background: rgba(255,255,255,0.35);
+    /* Boxed stories (2-3 most impactful only): black outline, card bg — makes them feel noteworthy */
+    .reader-story.boxed .reader-story-content {
+      border: 1.5px solid var(--text);
       border-radius: 4px;
       padding: 1.25rem 1.5rem;
+      background: rgba(255,255,255,0.3);
     }
-    .reader-story.lead::before {
+    .reader-story.boxed:hover { transform: translateX(4px); }
+    .reader-story.boxed::before {
       background: var(--text);
       width: 12px; height: 12px;
       left: calc(-2rem - 1.5px);
     }
-    .reader-story.lead:hover {
-      transform: translateX(4px);
+    .reader-story.boxed .reader-story-title {
+      font-size: 1.05rem;
+      font-weight: 700;
     }
 
-    /* Non-featured (sidebar) stories stay flat */
-    .reader-story:not(.featured):not(.lead) .reader-story-content {
-      padding: 0.75rem 0;
-    }
-    .reader-story:not(.featured):not(.lead) .reader-story-title {
-      font-size: 0.82rem;
-    }
-    .reader-story:not(.featured):not(.lead) .reader-story-lede {
-      font-size: 0.75rem;
-    }
+    /* Featured (remaining top stories, no border — clean and flat) */
+    .reader-story.featured .reader-story-content { padding: 0.85rem 0; }
+    .reader-story.featured::before { background: var(--text); width: 10px; height: 10px; }
+    .reader-story.featured:hover { transform: translateX(2px); }
+
+    /* Sidebar / unfeatured: compact */
+    .reader-story:not(.featured):not(.boxed) .reader-story-content { padding: 0.75rem 0; }
+    .reader-story:not(.featured):not(.boxed) .reader-story-title { font-size: 0.82rem; }
+    .reader-story:not(.featured):not(.boxed) .reader-story-lede { font-size: 0.75rem; }
 
     .reader-story-content { transition: all 0.15s; }
 
@@ -1303,7 +1283,7 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
 
   <div class="reader-section">Top Stories</div>
   <div class="reader-timeline">
-    <!-- Main 8 stories: use class="reader-story lead" for #1, class="reader-story featured" for #2-8 -->
+    <!-- Main 8 stories: use class="reader-story boxed" for the 2-3 most impactful, class="reader-story featured" for the rest -->
     {{READER_TOP_STORIES}}
   </div>
 
@@ -1362,10 +1342,10 @@ Each latest sidebar item should follow this structure:
 
 The reader view shows ALL 16 stories split into two sections with a vertical timeline spine.
 
-**Lead story (story #1)** — uses class `reader-story lead`:
+**Boxed stories (2-3 most impactful)** — uses class `reader-story boxed`. Only apply this to the 2-3 stories with the strongest cross-source signal or highest significance. The black outline makes them visually pop against the flat timeline, signaling "these are the ones that matter most."
 
 ```html
-<a class="reader-story lead" href="{{URL}}" target="_blank">
+<a class="reader-story boxed" href="{{URL}}" target="_blank">
   <div class="reader-story-content">
     <div class="reader-story-header">
       <span class="reader-story-title">{{HEADLINE}}</span>
@@ -1428,11 +1408,11 @@ The reader view shows ALL 16 stories split into two sections with a vertical tim
 **Date grouping:** Optionally insert `<div class="reader-date-group">Today</div>` or `<div class="reader-date-group">This Week</div>` before groups of stories that share a date range, instead of repeating the same date on every item.
 
 **Visual hierarchy:**
-- `lead` = largest bullet (12px), 4px left accent bar, larger title, bold hover shift
-- `featured` = medium bullet (10px), 3px left accent bar, bordered card, subtle hover shift
+- `boxed` = largest bullet (12px), black outline border, larger title (1.05rem), bold hover shift — **only 2-3 stories max**
+- `featured` = medium bullet (10px), no border, flat padding, subtle hover shift
 - unfeatured = small bullet (9px), no border, no background, compact text
 
-The `{{READER_TOP_STORIES}}` placeholder contains stories #1-8 (lead + featured). The `{{READER_SIDEBAR_STORIES}}` placeholder contains stories #9-16 (unfeatured). Both sit inside their own `.reader-timeline` wrapper which draws the vertical spine.
+The `{{READER_TOP_STORIES}}` placeholder contains stories #1-8 (2-3 boxed + rest featured). The `{{READER_SIDEBAR_STORIES}}` placeholder contains stories #9-16 (unfeatured). Both sit inside their own `.reader-timeline` wrapper which draws the vertical spine.
 
 ### Label class mapping
 
