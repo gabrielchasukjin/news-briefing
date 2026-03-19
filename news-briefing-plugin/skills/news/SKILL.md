@@ -8,11 +8,14 @@ argument-hint: [topic]
 
 Generate an editorially curated news briefing on a given topic (or general tech/AI news if no topic is provided) and output it as a self-contained HTML page that opens in the browser.
 
-The output is a dark-themed editorial page inspired by Bloomberg and WSJ, with:
+The output is an editorial page inspired by Bloomberg and WSJ, with a Bloomberg-style light/dark toggle:
 - A Bloomberg-style horizontal ticker bar with live market indices and story-relevant stock tickers
 - A WSJ-style hero zone: dominant headline on the left, stacked secondary stories on the right
 - Editorial labels on each story (NEW RELEASE, ANALYSIS, DEEP DIVE, GTC 2026, etc.)
 - A lower section with two feature stories and a "Latest" sidebar feed
+- A dedicated **"From X/Twitter"** section showing links shared by high-signal accounts with tweet context and attribution
+- A dedicated **"Trending on GitHub"** section with 4-column repo cards showing stars, language, and cross-signal notes
+- A Bloomberg-style light theme toggle (white background, clean typography, bold section headers)
 - Real links to source articles
 - Real images pulled from article og:image tags
 
@@ -523,7 +526,9 @@ From the scored pool, select exactly **8 stories** for the main layout, plus **~
 
 **"Latest" sidebar stories** — pick 6-8 additional stories from the pool that didn't make the main 8 but are still interesting. These only need a headline, source, and approximate time. Include HN point counts or comment counts where available as social proof. Include Twitter attribution where available (e.g., "Shared by @karpathy").
 
-**"Trending Repos" sidebar section** — below the "Latest" section, add a "Trending Repos" section showing 3-5 GitHub repos from Agent 6 that are relevant to the user's interests. Each repo gets a compact card with: repo name, star count today, one-line description, and language badge. These are inherently lower-signal than curated news, so the sidebar is the right home — unless a repo crosses 500+ stars today AND cross-signals with a main story, in which case it can be promoted to the main 8.
+**"From X/Twitter" dedicated section** — from Agent 5's results, select the **top shared link** as the section lead (image + headline + summary + sharing accounts). Then select **3-4 additional shared links** as secondary items (headline-only with sharing attribution). Finally, select **2-3 notable tweet quotes** from high-signal accounts that add editorial context — a pithy take, a surprising observation, or expert commentary on a trending story. If Agent 5 returned no useful results, omit this section entirely.
+
+**"Trending on GitHub" dedicated section** — from Agent 6's results, select **4 repositories** for full-width card treatment. Each card shows: repo name (owner/repo), stars today, one-line description, language badge, total stars, and any cross-signal notes. Prioritize repos that: (1) match user interests, (2) have 100+ stars today, (3) were created recently, (4) cross-signal with other agents. If fewer than 4 quality repos exist, show what you have — don't pad with irrelevant repos.
 
 **What to avoid:**
 - Generic fundraising announcements (unless the amount or implications are genuinely significant)
@@ -1432,6 +1437,290 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
       color: var(--text-muted); text-align: center; line-height: 1.8;
     }
     .reader-colophon a { color: var(--text-sub); text-decoration: underline; }
+
+    /* ── Bloomberg Light Theme ── */
+    body.bloomberg-mode {
+      --bg: #ffffff;
+      --surface: #f5f5f5;
+      --surface-2: #ebebeb;
+      --text: #1a1a1a;
+      --text-sub: #4a4a4a;
+      --text-muted: #8a8a8a;
+      --border: #e0e0e0;
+      --border-light: #ebebeb;
+      --accent: #1a1a1a;
+      --accent-dim: rgba(26,26,26,0.06);
+      --green: #16a34a;
+      --red: #dc2626;
+      background: var(--bg);
+      color: var(--text);
+    }
+    body.bloomberg-mode .nav { background: var(--bg); border-bottom: 2px solid var(--text); }
+    body.bloomberg-mode .nav-brand, body.bloomberg-mode .nav-brand span { color: var(--text); }
+    body.bloomberg-mode .nav-tab { color: var(--text); border-bottom-color: var(--text); }
+    body.bloomberg-mode .ticker-bar { background: var(--surface); }
+    body.bloomberg-mode .ticker-label { color: var(--text-muted); }
+    body.bloomberg-mode .ticker-value { color: var(--text); }
+    body.bloomberg-mode .label-analysis { color: #6b21a8; border-color: #6b21a8; }
+    body.bloomberg-mode .label-deepdive { color: #1d4ed8; border-color: #1d4ed8; }
+    body.bloomberg-mode .label-exclusive { color: #15803d; border-color: #15803d; }
+    body.bloomberg-mode .label-policy { color: #b45309; border-color: #b45309; }
+    body.bloomberg-mode .label-breaking { color: #dc2626; border-color: #dc2626; }
+    body.bloomberg-mode .sidebar-title { color: var(--text); }
+    body.bloomberg-mode .latest-time { color: var(--text-muted); font-weight: 600; }
+    body.bloomberg-mode .trending-title { color: var(--text); }
+    body.bloomberg-mode .trending-repo-stars { color: #b45309; }
+    body.bloomberg-mode .colophon { color: var(--text-muted); }
+    body.bloomberg-mode .colophon a { color: var(--text); }
+    body.bloomberg-mode .section-header { border-bottom-color: var(--text); }
+
+    /* ── Bloomberg Section Headers ── */
+    .section-header {
+      display: flex;
+      align-items: baseline;
+      gap: 1.5rem;
+      padding: 1.5rem 0 0.75rem;
+      border-bottom: 2px solid var(--text);
+      margin-bottom: 1.5rem;
+    }
+    .section-title {
+      font-size: 0.85rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+    }
+    .section-tabs {
+      display: flex;
+      gap: 1rem;
+    }
+    .section-tab {
+      font-size: 0.68rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      transition: color 0.15s;
+    }
+    .section-tab:hover { color: var(--text); }
+
+    /* ── Toggle Segmented Control ── */
+    .toggle-group {
+      display: flex;
+      align-items: center;
+      border: 1px solid var(--border-light);
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .toggle-btn {
+      font-family: var(--sans);
+      font-size: 0.62rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      padding: 5px 14px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+      border-right: 1px solid var(--border-light);
+    }
+    .toggle-btn:last-child { border-right: none; }
+    .toggle-btn:hover { color: var(--text); }
+    .toggle-btn.active {
+      background: var(--text);
+      color: var(--bg);
+    }
+    body.bloomberg-mode .toggle-group { border-color: var(--border); }
+    body.bloomberg-mode .toggle-btn { color: var(--text-muted); border-color: var(--border); }
+    body.bloomberg-mode .toggle-btn.active { background: var(--text); color: #fff; }
+
+    /* ── Twitter/X Section ── */
+    .twitter-section {
+      padding: 0 0 1.75rem;
+      border-bottom: 1px solid var(--border-light);
+    }
+    .twitter-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 300px;
+      gap: 0;
+    }
+    .twitter-lead {
+      padding-right: 2rem;
+      border-right: 1px solid var(--border-light);
+      transition: opacity 0.15s;
+    }
+    .twitter-lead:hover { opacity: 0.85; }
+    .twitter-lead-img {
+      width: 100%;
+      aspect-ratio: 16/10;
+      object-fit: cover;
+      border-radius: 5px;
+      margin-bottom: 0.75rem;
+    }
+    .twitter-lead h3 {
+      font-family: var(--serif);
+      font-size: 1.2rem;
+      font-weight: 700;
+      line-height: 1.3;
+      margin-bottom: 0.5rem;
+      transition: color 0.2s;
+    }
+    .twitter-lead:hover h3 { color: var(--accent); }
+    .twitter-lead .lede {
+      font-family: var(--body-serif);
+      font-size: 0.82rem;
+      color: var(--text-sub);
+      line-height: 1.6;
+      margin-bottom: 0.5rem;
+    }
+    .twitter-lead .shared-by {
+      font-size: 0.62rem;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .twitter-lead .meta {
+      font-size: 0.58rem;
+      color: var(--text-muted);
+      margin-top: 0.3rem;
+    }
+    body.bloomberg-mode .twitter-lead .shared-by { color: #1d4ed8; }
+    .twitter-mid {
+      padding: 0 1.5rem;
+      border-right: 1px solid var(--border-light);
+    }
+    .twitter-link-item {
+      display: block;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+      transition: opacity 0.15s;
+    }
+    .twitter-link-item:last-child { border-bottom: none; }
+    .twitter-link-item:hover { opacity: 0.8; }
+    .twitter-link-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      line-height: 1.4;
+      margin-bottom: 0.3rem;
+    }
+    .twitter-link-shared {
+      font-size: 0.58rem;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    body.bloomberg-mode .twitter-link-shared { color: #1d4ed8; }
+    .twitter-link-source {
+      font-size: 0.55rem;
+      color: var(--text-muted);
+      margin-top: 0.15rem;
+    }
+    .twitter-quotes {
+      padding-left: 1.5rem;
+    }
+    .twitter-quote {
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .twitter-quote:last-child { border-bottom: none; }
+    .twitter-quote-handle {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.3rem;
+    }
+    .twitter-quote-text {
+      font-family: var(--body-serif);
+      font-size: 0.75rem;
+      font-style: italic;
+      color: var(--text-sub);
+      line-height: 1.5;
+    }
+    .twitter-quote-context {
+      font-size: 0.55rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+
+    /* ── GitHub Section (Bloomberg 4-col grid) ── */
+    .github-section {
+      padding: 0 0 1.75rem;
+      border-bottom: 1px solid var(--border-light);
+    }
+    .github-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.25rem;
+    }
+    .github-card {
+      display: block;
+      padding: 1.25rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .github-card:hover {
+      border-color: var(--text-muted);
+      transform: translateY(-2px);
+    }
+    .github-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.6rem;
+    }
+    .github-card-stars {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #d97706;
+    }
+    .github-card-lang {
+      font-size: 0.55rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 3px;
+      background: var(--surface-2);
+      color: var(--text-sub);
+    }
+    .github-card-name {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+      line-height: 1.3;
+    }
+    .github-card-desc {
+      font-size: 0.72rem;
+      color: var(--text-sub);
+      line-height: 1.5;
+      margin-bottom: 0.5rem;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .github-card-meta {
+      font-size: 0.55rem;
+      color: var(--text-muted);
+    }
+    .github-card-signal {
+      font-size: 0.55rem;
+      color: var(--accent);
+      font-weight: 600;
+      margin-top: 0.3rem;
+    }
+    body.bloomberg-mode .github-card-signal { color: #1d4ed8; }
+
+    /* ── Responsive: new sections ── */
+    @media (max-width: 1060px) {
+      .twitter-grid { grid-template-columns: 1fr; }
+      .twitter-lead { padding-right: 0; border-right: none; border-bottom: 1px solid var(--border-light); padding-bottom: 1.5rem; }
+      .twitter-mid { padding: 1.5rem 0; border-right: none; border-bottom: 1px solid var(--border-light); }
+      .twitter-quotes { padding-left: 0; padding-top: 1.5rem; }
+      .github-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 600px) {
+      .github-grid { grid-template-columns: 1fr; }
+      .toggle-btn { padding: 4px 10px; font-size: 0.58rem; }
+    }
   </style>
 </head>
 <body>
@@ -1453,7 +1742,10 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
     <div class="nav-right">
       <span class="nav-tab">For You</span>
       <span class="nav-date">{{FULL_DATE}}</span>
-      <button class="view-toggle" onclick="toggleView()">Reader View</button>
+      <div class="toggle-group">
+        <button class="toggle-btn" onclick="toggleBloomberg()" id="bloomberg-toggle">Bloomberg</button>
+        <button class="toggle-btn" onclick="toggleReader()" id="reader-toggle">Reader</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1554,12 +1846,42 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
       <div class="sidebar-title">Latest</div>
       <!-- ~6-8 additional stories from the pool -->
       {{LATEST_ITEMS}}
+    </div>
+  </div>
 
-      <!-- Trending repos from GitHub -->
-      <div class="trending-section">
-        <div class="trending-title">Trending Repos</div>
-        {{TRENDING_REPO_ITEMS}}
+  <!-- ── From X/Twitter (Bloomberg Feature+List pattern) ── -->
+  <div class="twitter-section">
+    <div class="section-header">
+      <span class="section-title">From X / Twitter</span>
+    </div>
+    <div class="twitter-grid">
+      <!-- Lead shared link (biggest story from Twitter signal) -->
+      <a class="twitter-lead" href="{{TWITTER_LEAD_URL}}" target="_blank">
+        <img class="twitter-lead-img" src="{{TWITTER_LEAD_IMAGE}}" alt="">
+        <h3>{{TWITTER_LEAD_HEADLINE}}</h3>
+        <p class="lede">{{TWITTER_LEAD_SUMMARY}}</p>
+        <div class="shared-by">Shared by {{TWITTER_LEAD_SHARED_BY}}</div>
+        <div class="meta">{{TWITTER_LEAD_SOURCE}} · {{TWITTER_LEAD_TIME}}</div>
+      </a>
+      <!-- 3-4 additional shared links (headline-only) -->
+      <div class="twitter-mid">
+        {{TWITTER_LINK_ITEMS}}
       </div>
+      <!-- 2-3 notable tweet quotes with context -->
+      <div class="twitter-quotes">
+        {{TWITTER_QUOTE_ITEMS}}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Trending on GitHub (Bloomberg 4-col grid) ── -->
+  <div class="github-section">
+    <div class="section-header">
+      <span class="section-title">Trending on GitHub</span>
+    </div>
+    <div class="github-grid">
+      <!-- 4 repo cards from Agent 6 -->
+      {{GITHUB_CARD_ITEMS}}
     </div>
   </div>
 
@@ -1589,6 +1911,12 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
     {{READER_SIDEBAR_STORIES}}
   </div>
 
+  <div class="reader-section">From X / Twitter</div>
+  <div class="reader-timeline">
+    <!-- Twitter-sourced stories with attribution -->
+    {{READER_TWITTER_STORIES}}
+  </div>
+
   <div class="reader-section">Trending Repos</div>
   <div class="reader-timeline">
     <!-- 3-5 GitHub trending repos relevant to user interests -->
@@ -1602,11 +1930,22 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
 </div>
 
 <script>
-function toggleView() {
+function toggleBloomberg() {
   const body = document.body;
-  const btn = document.querySelector('.view-toggle');
+  body.classList.remove('reader-mode');
+  body.classList.toggle('bloomberg-mode');
+  updateToggleState();
+}
+function toggleReader() {
+  const body = document.body;
+  body.classList.remove('bloomberg-mode');
   body.classList.toggle('reader-mode');
-  btn.textContent = body.classList.contains('reader-mode') ? 'Editorial View' : 'Reader View';
+  updateToggleState();
+}
+function updateToggleState() {
+  const body = document.body;
+  document.getElementById('bloomberg-toggle').classList.toggle('active', body.classList.contains('bloomberg-mode'));
+  document.getElementById('reader-toggle').classList.toggle('active', body.classList.contains('reader-mode'));
 }
 </script>
 
@@ -1733,6 +2072,66 @@ Each trending repo in the sidebar should follow this structure:
 ```
 
 Where `{{CROSS_SIGNAL}}` is optionally ` · Also on HN` or ` · Shared by @handle` if the repo was found by another agent too.
+
+### Twitter link item format
+
+Each secondary shared link in the Twitter section middle column:
+
+```html
+<a class="twitter-link-item" href="{{URL}}" target="_blank">
+  <div class="twitter-link-title">{{HEADLINE}}</div>
+  <div class="twitter-link-shared">Shared by {{HANDLES}}</div>
+  <div class="twitter-link-source">{{SOURCE}} · {{RELATIVE_TIME}}</div>
+</a>
+```
+
+### Twitter quote item format
+
+Each notable tweet quote in the Twitter section right column:
+
+```html
+<div class="twitter-quote">
+  <div class="twitter-quote-handle">@{{HANDLE}}</div>
+  <div class="twitter-quote-text">"{{QUOTE_TEXT}}"</div>
+  <div class="twitter-quote-context">on {{TOPIC}} · {{RELATIVE_TIME}}</div>
+</div>
+```
+
+### GitHub card item format
+
+Each repo card in the GitHub section (4-column grid):
+
+```html
+<a class="github-card" href="https://github.com/{{OWNER}}/{{REPO}}" target="_blank">
+  <div class="github-card-header">
+    <span class="github-card-stars">★ {{STARS_TODAY}} today</span>
+    <span class="github-card-lang">{{LANGUAGE}}</span>
+  </div>
+  <div class="github-card-name">{{OWNER}}/{{REPO}}</div>
+  <div class="github-card-desc">{{DESCRIPTION}}</div>
+  <div class="github-card-meta">{{TOTAL_STARS}} total · Created {{RELATIVE_DATE}}</div>
+  <div class="github-card-signal">{{CROSS_SIGNAL}}</div>
+</a>
+```
+
+Where `{{CROSS_SIGNAL}}` is optionally "Also on HN · 342 pts" or "Shared by @karpathy" or empty string if no cross-signal.
+
+### Reader view Twitter story format
+
+Each Twitter-sourced story in the reader view uses the standard `reader-story` format with Twitter attribution in the source line:
+
+```html
+<a class="reader-story" href="{{URL}}" target="_blank">
+  <div class="reader-story-content">
+    <div class="reader-story-header">
+      <span class="reader-story-title">{{HEADLINE}}</span>
+      <span class="reader-story-date">{{DATE}}</span>
+    </div>
+    <div class="reader-story-lede">{{SHORT_SUMMARY}}</div>
+    <div class="reader-story-source">Shared by {{HANDLES}} · {{SOURCE}}</div>
+  </div>
+</a>
+```
 
 ### Label class mapping
 
