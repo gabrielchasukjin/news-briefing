@@ -155,35 +155,39 @@ Add the discovered sources to the user's `~/.news-briefing/profile.json` under a
 
 On future runs, if `domain_sources` already exists in the cached profile, skip this phase and use the cached sources directly.
 
-### Phase 1: Source from High-Signal Feeds (Three Independent Sub-Agents)
+### Phase 1: Source from High-Signal Feeds (Four Independent Sub-Agents)
 
-Launch **three Agent sub-agents in parallel**. Each agent independently discovers and evaluates stories, then returns a ranked list. This architecture ensures:
+Launch **four Agent sub-agents in parallel**. Each agent independently discovers and evaluates stories, then returns a ranked list. This architecture ensures:
 - Each agent explores different source types without overlap
 - No single failure mode kills the pipeline
 - Each agent applies its own quality filter before returning results
 
-All three agents receive the **topic** (if provided) and the **user interest profile** for context.
+All four agents receive the **topic** (if provided) and the **user interest profile** for context.
 
-#### Agent 1: Community Signal Scanner
+#### Agent 1: Community Signal Scanner (HN + Techmeme + Lobsters)
 
 **Launch with:** `Agent` tool, subagent_type `general-purpose`
+
+The user especially values Hacker News — always surface the top HN stories prominently.
 
 **Prompt the agent to:**
 
 1. Fetch these community-curated feeds using **WebFetch** (all in parallel):
-   - `https://news.ycombinator.com/front` — Extract story titles, URLs, source domains, point counts, comment counts
+   - `https://news.ycombinator.com/front` — Extract ALL stories with titles, URLs, source domains, point counts, comment counts. **HN is the user's most valued source — extract thoroughly.**
+   - `https://news.ycombinator.com/best` — Also fetch the "best" page to catch high-signal stories that may have rotated off the front page
    - `https://techmeme.com/` — Extract headlines, source outlets, clustering signals
    - `https://lobste.rs/` — Extract titles, URLs, tags, comment counts
 
-2. **Filter for relevance:** If a topic was provided, only keep stories directly related to the topic. If no topic, keep all stories above 100 points (HN) or featured (Techmeme).
+2. **Filter for relevance:** If a topic was provided, only keep stories directly related to the topic. If no topic, keep all stories above 100 points (HN) or featured (Techmeme). **Always include the top 5 HN stories by points regardless of topic match** — the user wants to see what's trending on HN.
 
 3. **Quality signals to extract per story:**
    - Title and original source URL (NOT the discussion thread URL)
    - Point count / comment count / upvote count
    - Source domain reputation (e.g., arxiv.org > random blog)
    - Which feeds it appeared on (cross-source = higher signal)
+   - For HN stories with 300+ comments, note the comment count — high discussion = high signal
 
-4. **Return:** A JSON-formatted list of 10-15 stories, ranked by engagement. Each entry: `{title, url, source, points, comments, feeds_appeared_on}`.
+4. **Return:** A JSON-formatted list of 15-20 stories, ranked by engagement. Each entry: `{title, url, source, points, comments, feeds_appeared_on}`.
 
 #### Agent 2: Domain Feed Scanner
 
@@ -269,23 +273,77 @@ This agent does NOT use generic queries. It crafts **precise, editorial-quality 
 
 5. **Return:** A JSON-formatted list of 8-12 stories, ranked by quality of reporting. Each entry: `{title, url, source, summary, has_original_reporting, og_image}`.
 
+#### Agent 4: Email Newsletter Scanner (TLDR AI + TLDR Data)
+
+**Launch with:** `Agent` tool, subagent_type `general-purpose`
+
+This agent reads the user's email newsletters via the `gws` CLI. These newsletters are pre-curated by expert editors and contain high-signal stories that may not appear on HN or Techmeme.
+
+**Prompt the agent to:**
+
+1. **Check if `gws` is available** by running: `which gws 2>/dev/null`. If not found, return an empty list immediately.
+
+2. **Fetch recent TLDR AI and TLDR Data emails** using these Bash commands in parallel:
+
+   ```bash
+   # Get message IDs for TLDR emails from the last 3 days
+   gws gmail users messages list --params '{"userId":"me","q":"from:dan@tldrnewsletter.com TLDR newer_than:3d","maxResults":5}'
+   ```
+
+3. **For each message ID returned**, fetch the full body:
+
+   ```bash
+   gws gmail users messages get --params '{"userId":"me","id":"MESSAGE_ID","format":"full"}'
+   ```
+
+   Then decode the base64 text/plain body part using Python:
+   ```bash
+   ... | python3 -c "
+   import sys, json, base64
+   lines = sys.stdin.read().strip().split('\n')
+   for i, l in enumerate(lines):
+     if l.strip().startswith('{'):
+       msg = json.loads('\n'.join(lines[i:]))
+       break
+   parts = msg.get('payload',{}).get('parts',[])
+   for p in parts:
+     if p.get('mimeType') == 'text/plain':
+       print(base64.urlsafe_b64decode(p['body']['data']).decode('utf-8')[:5000])
+       break
+   "
+   ```
+
+4. **Parse the newsletter content.** TLDR newsletters follow a consistent format:
+   - `HEADLINES & LAUNCHES` section — product releases, major announcements
+   - `DEEP DIVES & ANALYSIS` section — technical analysis, engineering posts
+   - Each story has a title in ALL CAPS, a reading time estimate, and a 2-3 sentence summary
+   - URLs are embedded as numbered references `[N]`
+
+   Extract each story with: title, summary, source URL (from the numbered references), and which newsletter it came from (TLDR AI or TLDR Data).
+
+5. **Filter:** If a topic was provided, only keep stories related to the topic. If no topic, keep the 8-10 most interesting stories.
+
+6. **Return:** A JSON-formatted list of stories. Each entry: `{title, url, source, summary, newsletter, reading_time}`.
+
 #### Step 1C: Merge and Score
 
-After all three agents return, merge their results into a single pool (typically 25-40 stories after de-duplication).
+After all four agents return, merge their results into a single pool (typically 30-50 stories after de-duplication).
 
 **Scoring algorithm (apply in order):**
 
-1. **Cross-agent signal (strongest):** A story found by 2+ agents scores highest. If Agent 1 found it on HN with 400+ pts AND Agent 3 found it via search, that's near-guaranteed high quality.
+1. **Cross-agent signal (strongest):** A story found by 2+ agents scores highest. If Agent 1 found it on HN with 400+ pts AND Agent 4 found it in TLDR AI AND Agent 3 found it via search, that's near-guaranteed high quality.
 
-2. **Community engagement:** HN 300+ pts, Techmeme featured, or Lobsters 50+ pts.
+2. **Community engagement:** HN 300+ pts, Techmeme featured, or Lobsters 50+ pts. **Top 5 HN stories by points should always be considered for the final selection** — the user explicitly values HN trends.
 
-3. **Original reporting bonus:** Stories flagged by Agent 3 as having original reporting (not press release rewrites) get a boost.
+3. **Newsletter signal:** Stories that appear in TLDR AI or TLDR Data "HEADLINES & LAUNCHES" sections are pre-curated by expert editors and get a signal boost. Stories in both a TLDR newsletter AND HN/Techmeme are very high quality.
 
-4. **Source reputation:** Known quality outlets (Ars Technica, TechCrunch, The Verge, NVIDIA Newsroom for NVIDIA topics, etc.) score higher than unknown blogs.
+4. **Original reporting bonus:** Stories flagged by Agent 3 as having original reporting (not press release rewrites) get a boost.
 
-5. **Recency:** Stories from the last 48 hours score higher than older ones.
+5. **Source reputation:** Known quality outlets (Ars Technica, TechCrunch, The Verge, NVIDIA Newsroom for NVIDIA topics, etc.) score higher than unknown blogs.
 
-6. **Interest match:** Stories matching the user's HIGH-weight interest tags get a relevance boost (only applies when no explicit topic is given).
+6. **Recency:** Stories from the last 48 hours score higher than older ones.
+
+7. **Interest match:** Stories matching the user's HIGH-weight interest tags get a relevance boost (only applies when no explicit topic is given).
 
 **De-duplicate:** If multiple stories cover the same event, keep the one with the best source + highest engagement. Drop the rest.
 
