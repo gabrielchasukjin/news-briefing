@@ -968,7 +968,7 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
     }
     .view-toggle:hover { color: var(--text); border-color: var(--text-muted); }
 
-    /* ── Reader View (PI-inspired) ── */
+    /* ── Reader View (PI-inspired, enhanced) ── */
     .reader-view { display: none; }
     body.reader-mode .bloomberg-view { display: none; }
     body.reader-mode .reader-view { display: block; }
@@ -984,106 +984,182 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
       --border-light: #c8c2ba;
       --accent: #1a1a1a;
       --mono: 'IBM Plex Mono', 'Menlo', monospace;
+      --tag-robotics: #2563eb;
+      --tag-agents: #7c3aed;
+      --tag-crypto: #d97706;
+      --tag-ml: #059669;
+      --tag-policy: #dc2626;
+      --tag-tools: #6b7280;
       background: var(--bg);
       color: var(--text);
     }
-    body.reader-mode .nav {
-      background: var(--bg);
-      border-bottom: 1px solid var(--border);
-    }
-    body.reader-mode .nav-brand { color: var(--text); }
-    body.reader-mode .nav-brand span { color: var(--text); }
+    body.reader-mode .nav { background: var(--bg); border-bottom: 1px solid var(--border); }
+    body.reader-mode .nav-brand, body.reader-mode .nav-brand span { color: var(--text); }
     body.reader-mode .nav-tab { color: var(--text); border-bottom-color: var(--text); }
     body.reader-mode .nav-date { color: var(--text-muted); }
     body.reader-mode .view-toggle { color: var(--text-muted); border-color: var(--border); }
     body.reader-mode .view-toggle:hover { color: var(--text); border-color: var(--text-muted); }
 
-    .reader-view {
-      max-width: 720px;
-      margin: 0 auto;
-      padding: 2.5rem 2rem 4rem;
-    }
-    .reader-header {
-      margin-bottom: 2.5rem;
-    }
+    .reader-view { max-width: 720px; margin: 0 auto; padding: 2.5rem 2rem 4rem; }
+    .reader-header { margin-bottom: 2.5rem; }
     .reader-title {
       font-family: 'Playfair Display', Georgia, serif;
-      font-size: 2.2rem;
-      font-weight: 400;
-      line-height: 1.2;
-      color: var(--text);
-      margin-bottom: 1rem;
-      letter-spacing: -0.01em;
+      font-size: 2.2rem; font-weight: 400; line-height: 1.2;
+      margin-bottom: 1rem; letter-spacing: -0.01em;
     }
     .reader-subtitle {
-      font-family: var(--mono);
-      font-size: 0.85rem;
-      color: var(--text-sub);
-      line-height: 1.7;
+      font-family: var(--mono); font-size: 0.85rem;
+      color: var(--text-sub); line-height: 1.7;
     }
+
+    /* Section dividers */
+    .reader-section {
+      font-family: var(--mono); font-size: 0.7rem; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--text-muted); padding: 1.5rem 0 0.5rem;
+      border-bottom: 1px solid var(--border); margin-bottom: 0.5rem;
+    }
+
+    /* Date group headers */
+    .reader-date-group {
+      font-family: var(--mono); font-size: 0.68rem; font-weight: 500;
+      color: var(--text-muted); letter-spacing: 0.04em;
+      padding: 1.25rem 0 0.25rem 2rem;
+    }
+
+    /* Timeline spine */
+    .reader-timeline {
+      position: relative;
+      padding-left: 2rem;
+    }
+    .reader-timeline::before {
+      content: '';
+      position: absolute;
+      left: 4px;
+      top: 0;
+      bottom: 0;
+      width: 1.5px;
+      background: var(--border);
+    }
+
+    /* Story base */
     .reader-story {
-      display: flex;
-      gap: 1rem;
-      padding: 1.25rem 0;
+      display: block;
+      position: relative;
+      padding: 1rem 0 1rem 1.5rem;
       text-decoration: none;
       color: inherit;
-      transition: opacity 0.15s;
+      transition: transform 0.15s, opacity 0.15s;
     }
-    .reader-story:hover { opacity: 0.75; }
-    .reader-bullet {
-      width: 10px;
-      height: 10px;
-      min-width: 10px;
-      background: var(--text);
+    .reader-story:hover { opacity: 0.8; }
+
+    /* Bullet on the spine */
+    .reader-story::before {
+      content: '';
+      position: absolute;
+      left: -2rem;
+      top: 1.5rem;
+      width: 9px; height: 9px;
+      background: var(--text-muted);
       border-radius: 50%;
-      margin-top: 0.5rem;
+      border: 2px solid var(--bg);
+      z-index: 1;
     }
-    .reader-story-content {
-      flex: 1;
-      border: 1px solid transparent;
+
+    /* Featured stories get bordered card + accent bar */
+    .reader-story.featured .reader-story-content {
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--text);
+      background: rgba(255,255,255,0.3);
       border-radius: 4px;
       padding: 1rem 1.25rem;
-      transition: border-color 0.2s;
     }
-    .reader-story:nth-child(odd) .reader-story-content {
-      border-color: var(--border);
-      background: rgba(255,255,255,0.3);
+    .reader-story.featured:hover {
+      transform: translateX(3px);
     }
+    .reader-story.featured::before {
+      background: var(--text);
+      width: 10px; height: 10px;
+    }
+
+    /* Lead story (first story) gets extra treatment */
+    .reader-story.lead .reader-story-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+    .reader-story.lead .reader-story-content {
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--text);
+      background: rgba(255,255,255,0.35);
+      border-radius: 4px;
+      padding: 1.25rem 1.5rem;
+    }
+    .reader-story.lead::before {
+      background: var(--text);
+      width: 12px; height: 12px;
+      left: calc(-2rem - 1.5px);
+    }
+    .reader-story.lead:hover {
+      transform: translateX(4px);
+    }
+
+    /* Non-featured (sidebar) stories stay flat */
+    .reader-story:not(.featured):not(.lead) .reader-story-content {
+      padding: 0.75rem 0;
+    }
+    .reader-story:not(.featured):not(.lead) .reader-story-title {
+      font-size: 0.82rem;
+    }
+    .reader-story:not(.featured):not(.lead) .reader-story-lede {
+      font-size: 0.75rem;
+    }
+
+    .reader-story-content { transition: all 0.15s; }
+
     .reader-story-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 1rem;
-      margin-bottom: 0.5rem;
+      display: flex; justify-content: space-between;
+      align-items: baseline; gap: 1rem; margin-bottom: 0.4rem;
     }
     .reader-story-title {
-      font-family: var(--mono);
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--text);
-      line-height: 1.4;
+      font-family: var(--mono); font-size: 0.9rem;
+      font-weight: 600; line-height: 1.4;
     }
     .reader-story-date {
-      font-family: var(--mono);
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      white-space: nowrap;
+      font-family: var(--mono); font-size: 0.7rem;
+      color: var(--text-muted); white-space: nowrap;
     }
+
+    /* Topic tags */
+    .reader-tags { display: flex; gap: 0.4rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
+    .reader-tag {
+      font-family: var(--mono); font-size: 0.55rem; font-weight: 600;
+      letter-spacing: 0.04em; text-transform: uppercase;
+      padding: 2px 7px; border-radius: 3px;
+      background: rgba(0,0,0,0.05); color: var(--text-muted);
+    }
+    .reader-tag.robotics { color: var(--tag-robotics); background: rgba(37,99,235,0.08); }
+    .reader-tag.agents { color: var(--tag-agents); background: rgba(124,58,237,0.08); }
+    .reader-tag.crypto { color: var(--tag-crypto); background: rgba(217,119,6,0.08); }
+    .reader-tag.ml { color: var(--tag-ml); background: rgba(5,150,105,0.08); }
+    .reader-tag.policy { color: var(--tag-policy); background: rgba(220,38,38,0.08); }
+    .reader-tag.tools { color: var(--tag-tools); background: rgba(107,114,128,0.08); }
+
     .reader-story-lede {
-      font-family: var(--mono);
-      font-size: 0.8rem;
-      color: var(--text-sub);
-      line-height: 1.65;
+      font-family: var(--mono); font-size: 0.8rem;
+      color: var(--text-sub); line-height: 1.65;
     }
+
+    /* Source attribution */
+    .reader-story-source {
+      font-family: var(--mono); font-size: 0.65rem;
+      color: var(--text-muted); margin-top: 0.4rem;
+    }
+
     .reader-colophon {
-      margin-top: 2rem;
-      padding-top: 1.5rem;
+      margin-top: 2rem; padding-top: 1.5rem;
       border-top: 1px solid var(--border);
-      font-family: var(--mono);
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      text-align: center;
-      line-height: 1.8;
+      font-family: var(--mono); font-size: 0.7rem;
+      color: var(--text-muted); text-align: center; line-height: 1.8;
     }
     .reader-colophon a { color: var(--text-sub); text-decoration: underline; }
   </style>
@@ -1218,13 +1294,25 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
 
 </div>
 
-<!-- ── Reader View (PI-style) ── -->
+<!-- ── Reader View (PI-style, enhanced) ── -->
 <div class="reader-view">
   <div class="reader-header">
     <div class="reader-title">{{BRIEFING_TITLE}}</div>
     <div class="reader-subtitle">{{READER_SUBTITLE}}</div>
   </div>
-  {{READER_STORIES}}
+
+  <div class="reader-section">Top Stories</div>
+  <div class="reader-timeline">
+    <!-- Main 8 stories: use class="reader-story lead" for #1, class="reader-story featured" for #2-8 -->
+    {{READER_TOP_STORIES}}
+  </div>
+
+  <div class="reader-section">Also Noteworthy</div>
+  <div class="reader-timeline">
+    <!-- Sidebar 8 stories: use class="reader-story" (no featured class) -->
+    {{READER_SIDEBAR_STORIES}}
+  </div>
+
   <div class="reader-colophon">
     Sources: {{ALL_SOURCES_WITH_LINKS}}<br>
     Editorially curated &middot; Built with Claude Code &middot; {{CURRENT_DATE}}
@@ -1272,24 +1360,79 @@ Each latest sidebar item should follow this structure:
 
 ### Reader view story format
 
-The reader view shows ALL stories (main 8 + sidebar 8 = 16 total) as a flat, chronological timeline. Each story uses this structure:
+The reader view shows ALL 16 stories split into two sections with a vertical timeline spine.
+
+**Lead story (story #1)** — uses class `reader-story lead`:
+
+```html
+<a class="reader-story lead" href="{{URL}}" target="_blank">
+  <div class="reader-story-content">
+    <div class="reader-story-header">
+      <span class="reader-story-title">{{HEADLINE}}</span>
+      <span class="reader-story-date">{{DATE}}</span>
+    </div>
+    <div class="reader-tags">
+      <span class="reader-tag agents">AI AGENTS</span>
+      <span class="reader-tag policy">SECURITY</span>
+    </div>
+    <div class="reader-story-lede">{{SHORT_SUMMARY}}</div>
+    <div class="reader-story-source">{{SOURCE}} · {{ENGAGEMENT}}</div>
+  </div>
+</a>
+```
+
+**Featured stories (#2-8)** — uses class `reader-story featured`:
+
+```html
+<a class="reader-story featured" href="{{URL}}" target="_blank">
+  <div class="reader-story-content">
+    <div class="reader-story-header">
+      <span class="reader-story-title">{{HEADLINE}}</span>
+      <span class="reader-story-date">{{DATE}}</span>
+    </div>
+    <div class="reader-tags">
+      <span class="reader-tag robotics">ROBOTICS</span>
+    </div>
+    <div class="reader-story-lede">{{SHORT_SUMMARY}}</div>
+    <div class="reader-story-source">{{SOURCE}} · {{ENGAGEMENT}}</div>
+  </div>
+</a>
+```
+
+**Sidebar stories (#9-16)** — uses class `reader-story` (no featured):
 
 ```html
 <a class="reader-story" href="{{URL}}" target="_blank">
-  <div class="reader-bullet"></div>
   <div class="reader-story-content">
     <div class="reader-story-header">
       <span class="reader-story-title">{{HEADLINE}}</span>
       <span class="reader-story-date">{{DATE}}</span>
     </div>
     <div class="reader-story-lede">{{SHORT_SUMMARY}}</div>
+    <div class="reader-story-source">{{SOURCE}}</div>
   </div>
 </a>
 ```
 
-The `{{READER_SUBTITLE}}` placeholder should be a 2-3 sentence monospace-friendly description of the briefing's theme (e.g., "Curated from Hacker News, Techmeme, ArXiv, and domain feeds. Covering robotics, AI agents, crypto, and developer tools.").
+**Tag class mapping:**
 
-The `{{READER_STORIES}}` placeholder should contain one `reader-story` block for each of the 16 stories, ordered by significance (main 8 first, then sidebar 8). Odd-numbered stories get the bordered card treatment automatically via CSS.
+| Topic | CSS class | Used for |
+|---|---|---|
+| Robotics, physical AI | `reader-tag robotics` | Blue pill |
+| AI agents, coding agents | `reader-tag agents` | Purple pill |
+| Crypto, DeFi, prediction markets | `reader-tag crypto` | Amber pill |
+| ML, deep learning, research | `reader-tag ml` | Green pill |
+| Policy, regulation, legal | `reader-tag policy` | Red pill |
+| Tools, frameworks, developer | `reader-tag tools` | Gray pill |
+
+**Date grouping:** Optionally insert `<div class="reader-date-group">Today</div>` or `<div class="reader-date-group">This Week</div>` before groups of stories that share a date range, instead of repeating the same date on every item.
+
+**Visual hierarchy:**
+- `lead` = largest bullet (12px), 4px left accent bar, larger title, bold hover shift
+- `featured` = medium bullet (10px), 3px left accent bar, bordered card, subtle hover shift
+- unfeatured = small bullet (9px), no border, no background, compact text
+
+The `{{READER_TOP_STORIES}}` placeholder contains stories #1-8 (lead + featured). The `{{READER_SIDEBAR_STORIES}}` placeholder contains stories #9-16 (unfeatured). Both sit inside their own `.reader-timeline` wrapper which draws the vertical spine.
 
 ### Label class mapping
 
