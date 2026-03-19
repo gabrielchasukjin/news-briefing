@@ -607,6 +607,18 @@ If stockanalysis.com fails for a ticker, fall back to **WebSearch** for `"{TICKE
 - Use exact values (e.g., `6,716.09` not `Flat`). Show the actual index number.
 - Include both the value and the percentage change with colored up/down badges.
 
+#### Step 4D: Select featured stock and fetch intraday data
+
+Choose the most relevant stock for today's briefing based on which ticker appears in the most stories or has the most significant news. Use **WebFetch** on `https://stockanalysis.com/stocks/{TICKER}/` to extract:
+- Open, High, Low, Close prices
+- Any available intraday price points
+
+If exact intraday data isn't available, construct approximate 15-minute interval data points from open to close using the Open, High, Low, Close values to create a realistic price curve.
+
+Format as a JSON array: `[["9:30", 178.01], ["9:45", 178.55], ...]` with ~25-30 data points covering 9:30 AM to 4:00 PM ET.
+
+The `{{CHART_REASON}}` placeholder should explain WHY this stock was selected, referencing the stories that feature it (e.g., "Featured: NVIDIA NemoClaw (365 pts on HN) · NVIDIA SONIC humanoid teleoperation").
+
 ### Phase 5: Generate HTML
 
 Write the HTML file using the **Write** tool to the user's Desktop at `~/Desktop/news-briefing.html`.
@@ -1263,181 +1275,6 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
     }
     .view-toggle:hover { color: var(--text); border-color: var(--text-muted); }
 
-    /* ── Reader View (PI-inspired, enhanced) ── */
-    .reader-view { display: none; }
-    body.reader-mode .bloomberg-view { display: none; }
-    body.reader-mode .reader-view { display: block; }
-    body.reader-mode .ticker-bar { display: none; }
-
-    body.reader-mode {
-      --bg: #f0ebe4;
-      --surface: #e8e2da;
-      --text: #1a1a1a;
-      --text-sub: #4a4540;
-      --text-muted: #8a8480;
-      --border: #d4cec6;
-      --border-light: #c8c2ba;
-      --accent: #1a1a1a;
-      --mono: 'IBM Plex Mono', 'Menlo', monospace;
-      --tag-robotics: #2563eb;
-      --tag-agents: #7c3aed;
-      --tag-crypto: #d97706;
-      --tag-ml: #059669;
-      --tag-policy: #dc2626;
-      --tag-tools: #6b7280;
-      background: var(--bg);
-      color: var(--text);
-    }
-    body.reader-mode .nav { background: var(--bg); border-bottom: 1px solid var(--border); }
-    body.reader-mode .nav-brand, body.reader-mode .nav-brand span { color: var(--text); }
-    body.reader-mode .nav-tab { color: var(--text); border-bottom-color: var(--text); }
-    body.reader-mode .nav-date { color: var(--text-muted); }
-    body.reader-mode .view-toggle { color: var(--text-muted); border-color: var(--border); }
-    body.reader-mode .view-toggle:hover { color: var(--text); border-color: var(--text-muted); }
-
-    .reader-view { max-width: 720px; margin: 0 auto; padding: 2.5rem 2rem 4rem; }
-    .reader-header { margin-bottom: 2.5rem; }
-    .reader-title {
-      font-family: 'Playfair Display', Georgia, serif;
-      font-size: 2.2rem; font-weight: 400; line-height: 1.2;
-      margin-bottom: 1rem; letter-spacing: -0.01em;
-    }
-    .reader-subtitle {
-      font-family: var(--mono); font-size: 0.85rem;
-      color: var(--text-sub); line-height: 1.7;
-    }
-
-    /* Section dividers */
-    .reader-section {
-      font-family: var(--mono); font-size: 0.7rem; font-weight: 600;
-      letter-spacing: 0.08em; text-transform: uppercase;
-      color: var(--text-muted); padding: 1.5rem 0 0.5rem;
-      border-bottom: 1px solid var(--border); margin-bottom: 0.5rem;
-    }
-
-    /* Date group headers */
-    .reader-date-group {
-      font-family: var(--mono); font-size: 0.68rem; font-weight: 500;
-      color: var(--text-muted); letter-spacing: 0.04em;
-      padding: 1.25rem 0 0.25rem 2rem;
-    }
-
-    /* Timeline spine */
-    .reader-timeline {
-      position: relative;
-      padding-left: 2rem;
-    }
-    .reader-timeline::before {
-      content: '';
-      position: absolute;
-      left: 4px;
-      top: 0;
-      bottom: 0;
-      width: 1.5px;
-      background: var(--border);
-    }
-
-    /* Story base */
-    .reader-story {
-      display: block;
-      position: relative;
-      padding: 1rem 0 1rem 1.5rem;
-      text-decoration: none;
-      color: inherit;
-      transition: transform 0.15s, opacity 0.15s;
-    }
-    .reader-story:hover { opacity: 0.8; }
-
-    /* Bullet on the spine */
-    .reader-story::before {
-      content: '';
-      position: absolute;
-      left: -2rem;
-      top: 1.5rem;
-      width: 9px; height: 9px;
-      background: var(--text-muted);
-      border-radius: 50%;
-      border: 2px solid var(--bg);
-      z-index: 1;
-    }
-
-    /* Boxed stories (2-3 most impactful only): black outline, card bg — makes them feel noteworthy */
-    .reader-story.boxed .reader-story-content {
-      border: 1.5px solid var(--text);
-      border-radius: 4px;
-      padding: 1.25rem 1.5rem;
-      background: rgba(255,255,255,0.3);
-    }
-    .reader-story.boxed:hover { transform: translateX(4px); }
-    .reader-story.boxed::before {
-      background: var(--text);
-      width: 12px; height: 12px;
-      left: calc(-2rem - 1.5px);
-    }
-    .reader-story.boxed .reader-story-title {
-      font-size: 1.05rem;
-      font-weight: 700;
-    }
-
-    /* Featured (remaining top stories, no border — clean and flat) */
-    .reader-story.featured .reader-story-content { padding: 0.85rem 0; }
-    .reader-story.featured::before { background: var(--text); width: 10px; height: 10px; }
-    .reader-story.featured:hover { transform: translateX(2px); }
-
-    /* Sidebar / unfeatured: compact */
-    .reader-story:not(.featured):not(.boxed) .reader-story-content { padding: 0.75rem 0; }
-    .reader-story:not(.featured):not(.boxed) .reader-story-title { font-size: 0.82rem; }
-    .reader-story:not(.featured):not(.boxed) .reader-story-lede { font-size: 0.75rem; }
-
-    .reader-story-content { transition: all 0.15s; }
-
-    .reader-story-header {
-      display: flex; justify-content: space-between;
-      align-items: baseline; gap: 1rem; margin-bottom: 0.4rem;
-    }
-    .reader-story-title {
-      font-family: var(--mono); font-size: 0.9rem;
-      font-weight: 600; line-height: 1.4;
-    }
-    .reader-story-date {
-      font-family: var(--mono); font-size: 0.7rem;
-      color: var(--text-muted); white-space: nowrap;
-    }
-
-    /* Topic tags */
-    .reader-tags { display: flex; gap: 0.4rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
-    .reader-tag {
-      font-family: var(--mono); font-size: 0.55rem; font-weight: 600;
-      letter-spacing: 0.04em; text-transform: uppercase;
-      padding: 2px 7px; border-radius: 3px;
-      background: rgba(0,0,0,0.05); color: var(--text-muted);
-    }
-    .reader-tag.robotics { color: var(--tag-robotics); background: rgba(37,99,235,0.08); }
-    .reader-tag.agents { color: var(--tag-agents); background: rgba(124,58,237,0.08); }
-    .reader-tag.crypto { color: var(--tag-crypto); background: rgba(217,119,6,0.08); }
-    .reader-tag.ml { color: var(--tag-ml); background: rgba(5,150,105,0.08); }
-    .reader-tag.policy { color: var(--tag-policy); background: rgba(220,38,38,0.08); }
-    .reader-tag.tools { color: var(--tag-tools); background: rgba(107,114,128,0.08); }
-
-    .reader-story-lede {
-      font-family: var(--mono); font-size: 0.8rem;
-      color: var(--text-sub); line-height: 1.65;
-    }
-
-    /* Source attribution */
-    .reader-story-source {
-      font-family: var(--mono); font-size: 0.65rem;
-      color: var(--text-muted); margin-top: 0.4rem;
-    }
-
-    .reader-colophon {
-      margin-top: 2rem; padding-top: 1.5rem;
-      border-top: 1px solid var(--border);
-      font-family: var(--mono); font-size: 0.7rem;
-      color: var(--text-muted); text-align: center; line-height: 1.8;
-    }
-    .reader-colophon a { color: var(--text-sub); text-decoration: underline; }
-
     /* ── Bloomberg Light Theme ── */
     body.bloomberg-mode {
       --bg: #ffffff;
@@ -1500,34 +1337,25 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
     }
     .section-tab:hover { color: var(--text); }
 
-    /* ── Toggle Segmented Control ── */
-    .toggle-group {
-      display: flex;
-      align-items: center;
-      border: 1px solid var(--border-light);
-      border-radius: 5px;
-      overflow: hidden;
-    }
+    /* ── Toggle Button ── */
     .toggle-btn {
       font-family: var(--sans);
       font-size: 0.62rem;
       font-weight: 600;
       letter-spacing: 0.03em;
       padding: 5px 14px;
-      border: none;
+      border-radius: 5px;
+      border: 1px solid var(--border-light);
       background: transparent;
       color: var(--text-muted);
       cursor: pointer;
       transition: all 0.2s;
-      border-right: 1px solid var(--border-light);
     }
-    .toggle-btn:last-child { border-right: none; }
     .toggle-btn:hover { color: var(--text); }
     .toggle-btn.active {
       background: var(--text);
       color: var(--bg);
     }
-    body.bloomberg-mode .toggle-group { border-color: var(--border); }
     body.bloomberg-mode .toggle-btn { color: var(--text-muted); border-color: var(--border); }
     body.bloomberg-mode .toggle-btn.active { background: var(--text); color: #fff; }
 
@@ -1709,6 +1537,87 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
     }
     body.bloomberg-mode .github-card-signal { color: #1d4ed8; }
 
+    /* ── Markets Section (shadcn-style intraday chart) ── */
+    .markets-section {
+      padding: 0 0 1.75rem;
+      border-bottom: 1px solid var(--border-light);
+    }
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 0.25rem;
+    }
+    .chart-ticker-name {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .chart-company {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 0.15rem;
+    }
+    .chart-header-right { text-align: right; }
+    .chart-price {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+    .chart-change {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 600;
+      margin-top: 0.15rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .chart-change.up { color: var(--green); }
+    .chart-change.down { color: var(--red); }
+    .chart-subheader {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .chart-label {
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .chart-container {
+      width: 100%;
+      aspect-ratio: 4/1;
+      position: relative;
+    }
+    .chart-container canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+    .chart-footer {
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+    }
+    .chart-why {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+    body.bloomberg-mode .chart-card {
+      background: var(--surface);
+      border-color: var(--border);
+    }
+
     /* ── Responsive: new sections ── */
     @media (max-width: 1060px) {
       .twitter-grid { grid-template-columns: 1fr; }
@@ -1742,10 +1651,7 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
     <div class="nav-right">
       <span class="nav-tab">For You</span>
       <span class="nav-date">{{FULL_DATE}}</span>
-      <div class="toggle-group">
-        <button class="toggle-btn" onclick="toggleBloomberg()" id="bloomberg-toggle">Bloomberg</button>
-        <button class="toggle-btn" onclick="toggleReader()" id="reader-toggle">Reader</button>
-      </div>
+      <button class="toggle-btn" onclick="toggleBloomberg()" id="bloomberg-toggle" style="font-family:var(--sans);font-size:0.62rem;font-weight:600;padding:5px 14px;border-radius:5px;border:1px solid var(--border-light);background:transparent;color:var(--text-muted);cursor:pointer;">Bloomberg</button>
     </div>
   </div>
 </div>
@@ -1849,6 +1755,35 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
     </div>
   </div>
 
+  <!-- ── Markets (shadcn-style intraday chart) ── -->
+  <div class="markets-section">
+    <div class="section-header">
+      <span class="section-title">Markets</span>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-header-left">
+          <div class="chart-ticker-name">{{CHART_TICKER}}</div>
+          <div class="chart-company">{{CHART_COMPANY}}</div>
+        </div>
+        <div class="chart-header-right">
+          <div class="chart-price">{{CHART_PRICE}}</div>
+          <div class="chart-change {{CHART_DIRECTION}}">{{CHART_CHANGE}}</div>
+        </div>
+      </div>
+      <div class="chart-subheader">
+        <span class="chart-label">Intraday &middot; {{CURRENT_DATE}}</span>
+        <span class="chart-label">Open {{CHART_OPEN}} &middot; High {{CHART_HIGH}} &middot; Low {{CHART_LOW}}</span>
+      </div>
+      <div class="chart-container">
+        <canvas id="stockChart"></canvas>
+      </div>
+      <div class="chart-footer">
+        <span class="chart-why">{{CHART_REASON}}</span>
+      </div>
+    </div>
+  </div>
+
   <!-- ── From X/Twitter (Bloomberg Feature+List pattern) ── -->
   <div class="twitter-section">
     <div class="section-header">
@@ -1892,61 +1827,73 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
 
 </div>
 
-<!-- ── Reader View (PI-style, enhanced) ── -->
-<div class="reader-view">
-  <div class="reader-header">
-    <div class="reader-title">{{BRIEFING_TITLE}}</div>
-    <div class="reader-subtitle">{{READER_SUBTITLE}}</div>
-  </div>
-
-  <div class="reader-section">Top Stories</div>
-  <div class="reader-timeline">
-    <!-- Main 8 stories: use class="reader-story boxed" for the 2-3 most impactful, class="reader-story featured" for the rest -->
-    {{READER_TOP_STORIES}}
-  </div>
-
-  <div class="reader-section">Also Noteworthy</div>
-  <div class="reader-timeline">
-    <!-- Sidebar 8 stories: use class="reader-story" (no featured class) -->
-    {{READER_SIDEBAR_STORIES}}
-  </div>
-
-  <div class="reader-section">From X / Twitter</div>
-  <div class="reader-timeline">
-    <!-- Twitter-sourced stories with attribution -->
-    {{READER_TWITTER_STORIES}}
-  </div>
-
-  <div class="reader-section">Trending Repos</div>
-  <div class="reader-timeline">
-    <!-- 3-5 GitHub trending repos relevant to user interests -->
-    {{READER_TRENDING_REPOS}}
-  </div>
-
-  <div class="reader-colophon">
-    Sources: {{ALL_SOURCES_WITH_LINKS}}<br>
-    Editorially curated &middot; Built with Claude Code &middot; {{CURRENT_DATE}}
-  </div>
-</div>
-
 <script>
 function toggleBloomberg() {
-  const body = document.body;
-  body.classList.remove('reader-mode');
-  body.classList.toggle('bloomberg-mode');
-  updateToggleState();
+  document.body.classList.toggle('bloomberg-mode');
+  document.getElementById('bloomberg-toggle').classList.toggle('active', document.body.classList.contains('bloomberg-mode'));
+  renderChart();
 }
-function toggleReader() {
-  const body = document.body;
-  body.classList.remove('bloomberg-mode');
-  body.classList.toggle('reader-mode');
-  updateToggleState();
+
+// Intraday data: [[time, price], ...]
+const intradayData = {{INTRADAY_DATA_JSON}};
+
+function renderChart() {
+  const canvas = document.getElementById('stockChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+  const isBloomberg = document.body.classList.contains('bloomberg-mode');
+  const gridColor = isBloomberg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)';
+  const textColor = isBloomberg ? '#8a8a8a' : '#57534e';
+  const isUp = intradayData[intradayData.length-1][1] >= intradayData[0][1];
+  const lineColor = isUp ? '#4ade80' : '#f87171';
+  const gradTop = isUp ? (isBloomberg ? 'rgba(74,222,128,0.12)' : 'rgba(74,222,128,0.15)') : (isBloomberg ? 'rgba(248,113,113,0.12)' : 'rgba(248,113,113,0.15)');
+  const gradBot = 'rgba(0,0,0,0)';
+  const openLineColor = isBloomberg ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.12)';
+  const prices = intradayData.map(d => d[1]);
+  const minP = Math.min(...prices) - 0.5, maxP = Math.max(...prices) + 0.5;
+  const padL = 52, padR = 16, padT = 12, padB = 28;
+  const cW = W - padL - padR, cH = H - padT - padB;
+  const toX = i => padL + (i / (intradayData.length - 1)) * cW;
+  const toY = p => padT + (1 - (p - minP) / (maxP - minP)) * cH;
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '500 10px "IBM Plex Mono", monospace';
+  ctx.fillStyle = textColor;
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 5; i++) {
+    const p = minP + (i / 5) * (maxP - minP);
+    const y = toY(p);
+    ctx.strokeStyle = gridColor; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillText('$' + p.toFixed(2), padL - 6, y + 3.5);
+  }
+  const openY = toY(prices[0]);
+  ctx.strokeStyle = openLineColor; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(padL, openY); ctx.lineTo(W - padR, openY); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = textColor; ctx.textAlign = 'center';
+  const step = Math.max(1, Math.floor(intradayData.length / 6));
+  for (let i = 0; i < intradayData.length; i += step) ctx.fillText(intradayData[i][0], toX(i), H - 6);
+  if ((intradayData.length - 1) % step !== 0) ctx.fillText(intradayData[intradayData.length-1][0], toX(intradayData.length-1), H - 6);
+  const grad = ctx.createLinearGradient(0, padT, 0, padT + cH);
+  grad.addColorStop(0, gradTop); grad.addColorStop(1, gradBot);
+  ctx.beginPath(); ctx.moveTo(toX(0), toY(prices[0]));
+  for (let i = 1; i < prices.length; i++) { const cx = (toX(i-1)+toX(i))/2; ctx.bezierCurveTo(cx, toY(prices[i-1]), cx, toY(prices[i]), toX(i), toY(prices[i])); }
+  ctx.lineTo(toX(prices.length-1), padT+cH); ctx.lineTo(toX(0), padT+cH); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(toX(0), toY(prices[0]));
+  for (let i = 1; i < prices.length; i++) { const cx = (toX(i-1)+toX(i))/2; ctx.bezierCurveTo(cx, toY(prices[i-1]), cx, toY(prices[i]), toX(i), toY(prices[i])); }
+  ctx.strokeStyle = lineColor; ctx.lineWidth = 2; ctx.stroke();
+  const lx = toX(prices.length-1), ly = toY(prices[prices.length-1]);
+  ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI*2); ctx.fillStyle = lineColor; ctx.fill();
+  ctx.beginPath(); ctx.arc(lx, ly, 2, 0, Math.PI*2); ctx.fillStyle = isBloomberg ? '#ffffff' : '#0a0a0a'; ctx.fill();
 }
-function updateToggleState() {
-  const body = document.body;
-  document.getElementById('bloomberg-toggle').classList.toggle('active', body.classList.contains('bloomberg-mode'));
-  document.getElementById('reader-toggle').classList.toggle('active', body.classList.contains('reader-mode'));
-}
+window.addEventListener('load', renderChart);
+window.addEventListener('resize', renderChart);
 </script>
 
 </body>
@@ -1978,82 +1925,6 @@ Each latest sidebar item should follow this structure:
   <div class="latest-source">{{SOURCE}} · {{ENGAGEMENT}}</div>
 </a>
 ```
-
-### Reader view story format
-
-The reader view shows ALL 16 stories split into two sections with a vertical timeline spine.
-
-**Boxed stories (2-3 most impactful)** — uses class `reader-story boxed`. Only apply this to the 2-3 stories with the strongest cross-source signal or highest significance. The black outline makes them visually pop against the flat timeline, signaling "these are the ones that matter most."
-
-```html
-<a class="reader-story boxed" href="{{URL}}" target="_blank">
-  <div class="reader-story-content">
-    <div class="reader-story-header">
-      <span class="reader-story-title">{{HEADLINE}}</span>
-      <span class="reader-story-date">{{DATE}}</span>
-    </div>
-    <div class="reader-tags">
-      <span class="reader-tag agents">AI AGENTS</span>
-      <span class="reader-tag policy">SECURITY</span>
-    </div>
-    <div class="reader-story-lede">{{SHORT_SUMMARY}}</div>
-    <div class="reader-story-source">{{SOURCE}} · {{ENGAGEMENT}}</div>
-  </div>
-</a>
-```
-
-**Featured stories (#2-8)** — uses class `reader-story featured`:
-
-```html
-<a class="reader-story featured" href="{{URL}}" target="_blank">
-  <div class="reader-story-content">
-    <div class="reader-story-header">
-      <span class="reader-story-title">{{HEADLINE}}</span>
-      <span class="reader-story-date">{{DATE}}</span>
-    </div>
-    <div class="reader-tags">
-      <span class="reader-tag robotics">ROBOTICS</span>
-    </div>
-    <div class="reader-story-lede">{{SHORT_SUMMARY}}</div>
-    <div class="reader-story-source">{{SOURCE}} · {{ENGAGEMENT}}</div>
-  </div>
-</a>
-```
-
-**Sidebar stories (#9-16)** — uses class `reader-story` (no featured):
-
-```html
-<a class="reader-story" href="{{URL}}" target="_blank">
-  <div class="reader-story-content">
-    <div class="reader-story-header">
-      <span class="reader-story-title">{{HEADLINE}}</span>
-      <span class="reader-story-date">{{DATE}}</span>
-    </div>
-    <div class="reader-story-lede">{{SHORT_SUMMARY}}</div>
-    <div class="reader-story-source">{{SOURCE}}</div>
-  </div>
-</a>
-```
-
-**Tag class mapping:**
-
-| Topic | CSS class | Used for |
-|---|---|---|
-| Robotics, physical AI | `reader-tag robotics` | Blue pill |
-| AI agents, coding agents | `reader-tag agents` | Purple pill |
-| Crypto, DeFi, prediction markets | `reader-tag crypto` | Amber pill |
-| ML, deep learning, research | `reader-tag ml` | Green pill |
-| Policy, regulation, legal | `reader-tag policy` | Red pill |
-| Tools, frameworks, developer | `reader-tag tools` | Gray pill |
-
-**Date grouping:** Optionally insert `<div class="reader-date-group">Today</div>` or `<div class="reader-date-group">This Week</div>` before groups of stories that share a date range, instead of repeating the same date on every item.
-
-**Visual hierarchy:**
-- `boxed` = largest bullet (12px), black outline border, larger title (1.05rem), bold hover shift — **only 2-3 stories max**
-- `featured` = medium bullet (10px), no border, flat padding, subtle hover shift
-- unfeatured = small bullet (9px), no border, no background, compact text
-
-The `{{READER_TOP_STORIES}}` placeholder contains stories #1-8 (2-3 boxed + rest featured). The `{{READER_SIDEBAR_STORIES}}` placeholder contains stories #9-16 (unfeatured). Both sit inside their own `.reader-timeline` wrapper which draws the vertical spine.
 
 ### Trending repo item format
 
@@ -2116,22 +1987,18 @@ Each repo card in the GitHub section (4-column grid):
 
 Where `{{CROSS_SIGNAL}}` is optionally "Also on HN · 342 pts" or "Shared by @karpathy" or empty string if no cross-signal.
 
-### Reader view Twitter story format
+### Markets chart format
 
-Each Twitter-sourced story in the reader view uses the standard `reader-story` format with Twitter attribution in the source line:
+The markets section displays a shadcn-style intraday chart for the most relevant stock in the briefing.
 
-```html
-<a class="reader-story" href="{{URL}}" target="_blank">
-  <div class="reader-story-content">
-    <div class="reader-story-header">
-      <span class="reader-story-title">{{HEADLINE}}</span>
-      <span class="reader-story-date">{{DATE}}</span>
-    </div>
-    <div class="reader-story-lede">{{SHORT_SUMMARY}}</div>
-    <div class="reader-story-source">Shared by {{HANDLES}} · {{SOURCE}}</div>
-  </div>
-</a>
-```
+- `{{CHART_TICKER}}` — Stock ticker symbol (e.g., "NVDA")
+- `{{CHART_COMPANY}}` — Full company name (e.g., "NVIDIA Corporation")
+- `{{CHART_PRICE}}` — Current/close price (e.g., "$178.42")
+- `{{CHART_CHANGE}}` — Change string like "-$1.84 (-1.02%)"
+- `{{CHART_DIRECTION}}` — "up" or "down" CSS class
+- `{{CHART_OPEN}}`, `{{CHART_HIGH}}`, `{{CHART_LOW}}` — Day's OHLC values (e.g., "$179.50", "$181.20", "$176.80")
+- `{{CHART_REASON}}` — Why this stock was featured (e.g., "Featured: NVIDIA NemoClaw (365 pts on HN) · NVIDIA SONIC humanoid teleoperation")
+- `{{INTRADAY_DATA_JSON}}` — JSON array of [time, price] pairs (e.g., `[["9:30", 178.01], ["9:45", 178.55], ...]`) with ~25-30 data points covering 9:30 AM to 4:00 PM ET
 
 ### Label class mapping
 
