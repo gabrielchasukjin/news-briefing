@@ -565,9 +565,9 @@ Keep the actual article URL for linking.
 
 If an og:image cannot be found for a story, try fetching a related article on the same topic that has one.
 
-### Phase 4: Market Data Fetch
+### Phase 4: Market Data Fetch (Ticker Bar)
 
-This phase has two parts: **index data** and **dynamic ticker extraction**.
+This phase fetches market data for the horizontal ticker bar.
 
 #### Step 4A: Extract tickers from stories
 
@@ -606,18 +606,6 @@ If stockanalysis.com fails for a ticker, fall back to **WebSearch** for `"{TICKE
 - Never fabricate financial data. If you can't fetch a real price, omit that ticker.
 - Use exact values (e.g., `6,716.09` not `Flat`). Show the actual index number.
 - Include both the value and the percentage change with colored up/down badges.
-
-#### Step 4D: Select featured stock and fetch intraday data
-
-Choose the most relevant stock for today's briefing based on which ticker appears in the most stories or has the most significant news. Use **WebFetch** on `https://stockanalysis.com/stocks/{TICKER}/` to extract:
-- Open, High, Low, Close prices
-- Any available intraday price points
-
-If exact intraday data isn't available, construct approximate 15-minute interval data points from open to close using the Open, High, Low, Close values to create a realistic price curve.
-
-Format as a JSON array: `[["9:30", 178.01], ["9:45", 178.55], ...]` with ~25-30 data points covering 9:30 AM to 4:00 PM ET.
-
-The `{{CHART_REASON}}` placeholder should explain WHY this stock was selected, referencing the stories that feature it (e.g., "Featured: NVIDIA NemoClaw (365 pts on HN) · NVIDIA SONIC humanoid teleoperation").
 
 ### Phase 5: Generate HTML
 
@@ -1537,87 +1525,6 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
     }
     body.bloomberg-mode .github-card-signal { color: #1d4ed8; }
 
-    /* ── Markets Section (shadcn-style intraday chart) ── */
-    .markets-section {
-      padding: 0 0 1.75rem;
-      border-bottom: 1px solid var(--border-light);
-    }
-    .chart-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.5rem;
-    }
-    .chart-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 0.25rem;
-    }
-    .chart-ticker-name {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: var(--text);
-    }
-    .chart-company {
-      font-size: 0.72rem;
-      color: var(--text-muted);
-      margin-top: 0.15rem;
-    }
-    .chart-header-right { text-align: right; }
-    .chart-price {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: var(--text);
-      font-variant-numeric: tabular-nums;
-    }
-    .chart-change {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 0.72rem;
-      font-weight: 600;
-      margin-top: 0.15rem;
-      font-variant-numeric: tabular-nums;
-    }
-    .chart-change.up { color: var(--green); }
-    .chart-change.down { color: var(--red); }
-    .chart-subheader {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 1rem;
-      padding-bottom: 0.75rem;
-      border-bottom: 1px solid var(--border);
-    }
-    .chart-label {
-      font-size: 0.62rem;
-      color: var(--text-muted);
-      font-variant-numeric: tabular-nums;
-    }
-    .chart-container {
-      width: 100%;
-      aspect-ratio: 4/1;
-      position: relative;
-    }
-    .chart-container canvas {
-      width: 100% !important;
-      height: 100% !important;
-    }
-    .chart-footer {
-      margin-top: 0.75rem;
-      padding-top: 0.75rem;
-      border-top: 1px solid var(--border);
-    }
-    .chart-why {
-      font-size: 0.6rem;
-      color: var(--text-muted);
-      font-style: italic;
-    }
-    body.bloomberg-mode .chart-card {
-      background: var(--surface);
-      border-color: var(--border);
-    }
-
     /* ── Responsive: new sections ── */
     @media (max-width: 1060px) {
       .twitter-grid { grid-template-columns: 1fr; }
@@ -1755,35 +1662,6 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
     </div>
   </div>
 
-  <!-- ── Markets (shadcn-style intraday chart) ── -->
-  <div class="markets-section">
-    <div class="section-header">
-      <span class="section-title">Markets</span>
-    </div>
-    <div class="chart-card">
-      <div class="chart-header">
-        <div class="chart-header-left">
-          <div class="chart-ticker-name">{{CHART_TICKER}}</div>
-          <div class="chart-company">{{CHART_COMPANY}}</div>
-        </div>
-        <div class="chart-header-right">
-          <div class="chart-price">{{CHART_PRICE}}</div>
-          <div class="chart-change {{CHART_DIRECTION}}">{{CHART_CHANGE}}</div>
-        </div>
-      </div>
-      <div class="chart-subheader">
-        <span class="chart-label">Intraday &middot; {{CURRENT_DATE}}</span>
-        <span class="chart-label">Open {{CHART_OPEN}} &middot; High {{CHART_HIGH}} &middot; Low {{CHART_LOW}}</span>
-      </div>
-      <div class="chart-container">
-        <canvas id="stockChart"></canvas>
-      </div>
-      <div class="chart-footer">
-        <span class="chart-why">{{CHART_REASON}}</span>
-      </div>
-    </div>
-  </div>
-
   <!-- ── From X/Twitter (Bloomberg Feature+List pattern) ── -->
   <div class="twitter-section">
     <div class="section-header">
@@ -1831,69 +1709,8 @@ Use this exact structure. Replace all `{{placeholders}}` with real content.
 function toggleBloomberg() {
   document.body.classList.toggle('bloomberg-mode');
   document.getElementById('bloomberg-toggle').classList.toggle('active', document.body.classList.contains('bloomberg-mode'));
-  renderChart();
 }
 
-// Intraday data: [[time, price], ...]
-const intradayData = {{INTRADAY_DATA_JSON}};
-
-function renderChart() {
-  const canvas = document.getElementById('stockChart');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.parentElement.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  ctx.scale(dpr, dpr);
-  const W = rect.width, H = rect.height;
-  const isBloomberg = document.body.classList.contains('bloomberg-mode');
-  const gridColor = isBloomberg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)';
-  const textColor = isBloomberg ? '#8a8a8a' : '#57534e';
-  const isUp = intradayData[intradayData.length-1][1] >= intradayData[0][1];
-  const lineColor = isUp ? '#4ade80' : '#f87171';
-  const gradTop = isUp ? (isBloomberg ? 'rgba(74,222,128,0.12)' : 'rgba(74,222,128,0.15)') : (isBloomberg ? 'rgba(248,113,113,0.12)' : 'rgba(248,113,113,0.15)');
-  const gradBot = 'rgba(0,0,0,0)';
-  const openLineColor = isBloomberg ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.12)';
-  const prices = intradayData.map(d => d[1]);
-  const minP = Math.min(...prices) - 0.5, maxP = Math.max(...prices) + 0.5;
-  const padL = 52, padR = 16, padT = 12, padB = 28;
-  const cW = W - padL - padR, cH = H - padT - padB;
-  const toX = i => padL + (i / (intradayData.length - 1)) * cW;
-  const toY = p => padT + (1 - (p - minP) / (maxP - minP)) * cH;
-  ctx.clearRect(0, 0, W, H);
-  ctx.font = '500 10px "IBM Plex Mono", monospace';
-  ctx.fillStyle = textColor;
-  ctx.textAlign = 'right';
-  for (let i = 0; i <= 5; i++) {
-    const p = minP + (i / 5) * (maxP - minP);
-    const y = toY(p);
-    ctx.strokeStyle = gridColor; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
-    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillText('$' + p.toFixed(2), padL - 6, y + 3.5);
-  }
-  const openY = toY(prices[0]);
-  ctx.strokeStyle = openLineColor; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
-  ctx.beginPath(); ctx.moveTo(padL, openY); ctx.lineTo(W - padR, openY); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle = textColor; ctx.textAlign = 'center';
-  const step = Math.max(1, Math.floor(intradayData.length / 6));
-  for (let i = 0; i < intradayData.length; i += step) ctx.fillText(intradayData[i][0], toX(i), H - 6);
-  if ((intradayData.length - 1) % step !== 0) ctx.fillText(intradayData[intradayData.length-1][0], toX(intradayData.length-1), H - 6);
-  const grad = ctx.createLinearGradient(0, padT, 0, padT + cH);
-  grad.addColorStop(0, gradTop); grad.addColorStop(1, gradBot);
-  ctx.beginPath(); ctx.moveTo(toX(0), toY(prices[0]));
-  for (let i = 1; i < prices.length; i++) { const cx = (toX(i-1)+toX(i))/2; ctx.bezierCurveTo(cx, toY(prices[i-1]), cx, toY(prices[i]), toX(i), toY(prices[i])); }
-  ctx.lineTo(toX(prices.length-1), padT+cH); ctx.lineTo(toX(0), padT+cH); ctx.closePath();
-  ctx.fillStyle = grad; ctx.fill();
-  ctx.beginPath(); ctx.moveTo(toX(0), toY(prices[0]));
-  for (let i = 1; i < prices.length; i++) { const cx = (toX(i-1)+toX(i))/2; ctx.bezierCurveTo(cx, toY(prices[i-1]), cx, toY(prices[i]), toX(i), toY(prices[i])); }
-  ctx.strokeStyle = lineColor; ctx.lineWidth = 2; ctx.stroke();
-  const lx = toX(prices.length-1), ly = toY(prices[prices.length-1]);
-  ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI*2); ctx.fillStyle = lineColor; ctx.fill();
-  ctx.beginPath(); ctx.arc(lx, ly, 2, 0, Math.PI*2); ctx.fillStyle = isBloomberg ? '#ffffff' : '#0a0a0a'; ctx.fill();
-}
-window.addEventListener('load', renderChart);
-window.addEventListener('resize', renderChart);
 </script>
 
 </body>
@@ -1986,19 +1803,6 @@ Each repo card in the GitHub section (4-column grid):
 ```
 
 Where `{{CROSS_SIGNAL}}` is optionally "Also on HN · 342 pts" or "Shared by @karpathy" or empty string if no cross-signal.
-
-### Markets chart format
-
-The markets section displays a shadcn-style intraday chart for the most relevant stock in the briefing.
-
-- `{{CHART_TICKER}}` — Stock ticker symbol (e.g., "NVDA")
-- `{{CHART_COMPANY}}` — Full company name (e.g., "NVIDIA Corporation")
-- `{{CHART_PRICE}}` — Current/close price (e.g., "$178.42")
-- `{{CHART_CHANGE}}` — Change string like "-$1.84 (-1.02%)"
-- `{{CHART_DIRECTION}}` — "up" or "down" CSS class
-- `{{CHART_OPEN}}`, `{{CHART_HIGH}}`, `{{CHART_LOW}}` — Day's OHLC values (e.g., "$179.50", "$181.20", "$176.80")
-- `{{CHART_REASON}}` — Why this stock was featured (e.g., "Featured: NVIDIA NemoClaw (365 pts on HN) · NVIDIA SONIC humanoid teleoperation")
-- `{{INTRADAY_DATA_JSON}}` — JSON array of [time, price] pairs (e.g., `[["9:30", 178.01], ["9:45", 178.55], ...]`) with ~25-30 data points covering 9:30 AM to 4:00 PM ET
 
 ### Label class mapping
 
